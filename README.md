@@ -401,7 +401,7 @@ The most important functions in the standard library are:
 - `List_max(List) any`: returns the maximum item in a List;
 - `min(any, any) any`: returns the minimum of two values;
 - `max(any, any) any`: returns the maximum of two values;
-- `log(any) Null`: prints the given object on the screen;
+- `log(any) Null`: prints the given object on the console;
 - `stringify(any) String`: turns the given object into a string;
 - `stringifyType(any) String`: returns a string containing the name of the value type;
 - `parseInt(String) Int`: parses an Int from a String. Throws an exception if there is no parsable Int in the String;
