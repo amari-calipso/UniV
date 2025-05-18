@@ -1,0 +1,29 @@
+fn sawtooth(array) {
+    count := 4;
+
+    tmp := Array(len(array));
+    k := 0;
+    for j := 0; j < count; j++ {
+        for i := j; i < len(array); k++ {
+            tmp[k] = array[i];
+            i += count;
+        }
+    }
+
+    for i := 0; i < len(array); i++ {
+        array[i] = tmp[i];
+    }
+}
+
+@shuffle {
+    name: "Sawtooth"
+} fn sawtoothShuffle(array) {
+    sawtooth(array);
+}
+
+@shuffle {
+    name: "Reversed Sawtooth"
+} fn reversedSawtoothShuffle(array) {
+    sawtooth(array);
+    reverse(array, 0, len(array));
+}

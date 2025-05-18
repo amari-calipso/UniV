@@ -1,0 +1,7 @@
+@distribution {
+    name: "Linear"
+} fn linear(array) {
+    for i := 0; i < len(array); i++ {
+        array[i] = i;
+    }
+}

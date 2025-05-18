@@ -1,0 +1,18 @@
+@sort {
+    name:     "Bubble Sort",
+    listName: "Bubble Sort",
+    category: "Exchange Sorts"
+} fn bubbleSort(array: List) Null {
+    for i := 0; i < len(array); i++ {
+        sorted := true;
+
+        for j := 0; j < len(array) - 1 - i; j++ {
+            if array[j] > array[j + 1] {
+                swap(array, j, j + 1);
+                sorted = false;
+            }
+        }
+
+        if (sorted) break;
+    }
+}

@@ -1,0 +1,37 @@
+fn MergeSort_merge(array: List, a: Int, m: Int, b: Int, aux: List) Null {
+    l := a;
+    r := m;
+    o := 0;
+
+    for ; l < m && r < b; o++ {
+        if (array[l] <= array[r])
+             aux[o] = array[l++];
+        else aux[o] = array[r++];
+    }
+
+    while (l < m) aux[o++] = array[l++];
+    while (r < b) aux[o++] = array[r++];
+    arrayCopy(aux, 0, array, a, b - a);
+}
+
+fn mergeSortGivenAux(array: List, a: Int, b: Int, aux: List) Null {
+    if b - a > 1 {
+        m := a + ((b - a) / 2);
+
+        mergeSortGivenAux(array, a, m, aux);
+        mergeSortGivenAux(array, m, b, aux);
+        MergeSort_merge(array, a, m, b, aux);
+    }
+}
+
+fn mergeSort(array: List, a: Int, b: Int) Null {
+    mergeSortGivenAux(array, a, b, Array(b - a));
+}
+
+@sort {
+    name:     "Merge Sort",
+    listName: "Merge Sort",
+    category: "Merge Sorts"
+} fn mergeSortRun(array: List) Null {
+    mergeSort(array, 0, len(array));
+}

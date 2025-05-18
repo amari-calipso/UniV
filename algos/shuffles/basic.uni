@@ -1,0 +1,25 @@
+@shuffle {
+    name: "No shuffle"
+} fn noShuffle(array) {
+    for i := 0; i < len(array); i++ {
+        UniV_highlight(i);
+    }
+}
+
+@shuffle {
+    name: "Reversed"
+} fn reversedShuffle(array) {
+    reverse(array, 0, len(array));
+}
+
+fn shuffleRandom(array, a, b) {
+    for i := a; i < b; i++ {
+        swap(array, i, randomInt(i, b - 1));
+    }
+}
+
+@shuffle {
+    name: "Random"
+} fn randomShuffle(array) {
+    shuffleRandom(array, 0, len(array));
+}

@@ -1,0 +1,82 @@
+fn reverse(array: List, a: Int, b: Int) Null {
+    for b--; a < b; a++, b-- {
+        swap(array, a, b);
+    }
+}
+
+fn compSwap(array: List, a: Int, b: Int) Null {
+    if array[a] > array[b] {
+        swap(array, a, b);
+    }
+}
+
+fn arrayCopy(fromArray: List, fromIndex: Int, toArray: List, toIndex: Int, length: Int) Null {
+    if fromArray != toArray || toIndex < fromIndex {
+        for i := 0; i < length; i++ {
+            toArray[toIndex + i] = fromArray[fromIndex + i];
+        }
+    } else {
+        for i := length - 1; i >= 0; i-- {
+            toArray[toIndex + i] = fromArray[fromIndex + i];
+        }
+    }
+}
+
+bidirArrayCopy := arrayCopy;
+
+fn reverseArrayCopy(fromArray: List, fromIndex: Int, toArray: List, toIndex: Int, length: Int) Null {
+    if fromArray == toArray && toIndex < fromIndex {
+        for i := 0; i < length; i++ {
+            toArray[toIndex + i] = fromArray[fromIndex + i];
+        }
+    } else {
+        for i := length - 1; i >= 0; i-- {
+            toArray[toIndex + i] = fromArray[fromIndex + i];
+        }
+    }
+}
+
+fn checkSorted(array: List, a: Int, b: Int) Bool {
+    for i := a; i < b - 1; i++ {
+        if array[i] > array[i + 1] {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn findMaxIndex(array: List, a: Int, b: Int) Int {
+    UniV_markArray(0, a);
+    
+    idx := a;
+    max := array[a];
+
+    for i := a; i < b; i++ {
+        if array[i] > max {
+            max = array[i];
+            idx = i;
+            UniV_markArray(0, i);
+        }
+    }
+
+    UniV_clearMark(0);
+    return idx;
+}
+
+fn findMaxValue(array: List, a: Int, b: Int) {
+    UniV_markArray(0, a);
+    max := array[a];
+
+    for i := a; i < b; i++ {
+        if array[i] > max {
+            max = array[i];
+            UniV_markArray(0, i);
+        }
+    }
+
+    UniV_clearMark(0);
+    return max;
+}
+
+findMax := findMaxValue;

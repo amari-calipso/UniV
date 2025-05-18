@@ -1,0 +1,25 @@
+# build artifacts
+/target/
+/dist/
+/resources/gen/
+
+# generated module files
+/src/visuals/mod.rs
+/src/sounds/mod.rs
+/src/api_layers/mod.rs
+/src/language_layers/mod.rs
+
+# algorithms bytecode
+algos.unib
+
+# program settings
+/config/
+
+# dev_util binaries
+dev_util
+dev_util.exe
+
+# render output
+output.mp4
+tmp.mp4
+tmp.wav

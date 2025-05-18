@@ -1,0 +1,141 @@
+describe "Runs a sequence of sorting algorithms on a selected input."
+describe ""
+describe "This automation is not meant to be ran independently."
+describe "To run it, use the 'Run all sorts' screen in the main menu"
+
+run all sorts {
+    "Exchange Sorts" {
+        run sort "Bubble Sort"    with length 256 and speed 80 scaled by N_SQUARED_SCALE
+        run sort "Odd-Even Sort"  with length 256 and speed 20 scaled by N_SQUARED_SCALE
+        run sort "Gnome Sort"     with length 128 and speed  3 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Sandpaper Sort" with length 128 and speed  3 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Circle Sort"    with length 512 and speed  5 scaled by NLOG2N_SCALE
+        push 1.3
+        run sort "Comb Sort" with length 1024 and speed 10 scaled by NLOG2N_SCALE
+    }
+    "Insertion Sorts" {
+        run sort "Insertion Sort"        with length  256 and speed 8 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Binary Insertion"      with length  256 and speed 6 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Bin. Double Insert"    with length  256 and speed 5 scaled by N_SQUARED_SCALE
+        run sort "Merge Insert"          with length  256 and speed 5 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Shell Sort"            with length  512 and speed 3 scaled by C_NLOGN_SCALE
+        run sort "Shell Sort (Parallel)" with length 1024 and speed 3
+        run sort "Library Sort"          with length 1024 and speed 8 scaled by NLOGN_SCALE
+    }
+    "Selection Sorts" {
+        run sort "Selection Sort"   with length 128 and speed 3 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Double Selection" with length 128 and speed 3 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Cycle Sort"       with length  64 and speed 2 scaled by N_SQUARED_SCALE
+    }
+    "Tree Sorts" {
+        run sort "Tree Sort"      with length  512 and speed  5 scaled by C_NLOGN_SCALE
+        run sort "Max Heap Sort"  with length 2048 and speed 15 scaled by NLOGN_SCALE
+        run sort "Smooth Sort"    with length 2048 and speed 10 scaled by NLOGN_SCALE
+        run sort "Poplar Heap"    with length 2048 and speed 10 scaled by NLOGN_SCALE
+        run sort "Weak Heap Sort" with length 2048 and speed 15 scaled by NLOGN_SCALE
+        run sort "Patience Sort"  with length 2048 and speed 25 scaled by C_NLOGN_SCALE
+    }
+    "Concurrent Sorts" {
+        run sort "Bose Nelson"               with length 1024 and speed 7 scaled by NLOG2N_SCALE
+        run sort "Bose Nelson (Parallel)"    with length 2048 and speed 3
+        run sort "Fold Sort"                 with length 1024 and speed 7 scaled by NLOG2N_SCALE
+        run sort "Fold Sort (Parallel)"      with length 1024 and speed 4
+        run sort "3-Smooth Comb"             with length 1024 and speed 7 scaled by NLOG2N_SCALE
+        run sort "3-Smooth Comb (Parallel)"  with length 2048 and speed 2 
+        run sort "Bitonic Sort"              with length 1024 and speed 5 scaled by NLOG2N_SCALE
+        run sort "Bitonic Sort (Parallel)"   with length 2048 and speed 2
+        run sort "Pairwise"                  with length 1024 and speed 5 scaled by NLOG2N_SCALE
+        run sort "Weave"                     with length 1024 and speed 5 scaled by NLOG2N_SCALE
+        run sort "Weave (Parallel)"          with length 2048 and speed 2
+        run sort "Odd Even Merge"            with length 1024 and speed 5 scaled by NLOG2N_SCALE
+        run sort "Odd Even Merge (Parallel)" with length 2048 and speed 3
+    }
+    "Quick Sorts" {
+        push "First"
+        run sort "LL Quick Sort" with length 1024 and speed 4 scaled by NLOGN_SCALE
+        push "First"
+        run sort "LL Quick Sort (Parallel)" with length 1024 and speed 4 scaled by NLOGN_SCALE
+        push "Middle"
+        run sort "LR Quick Sort" with length 1024 and speed 4 scaled by NLOGN_SCALE
+        push "Middle"
+        run sort "LR Quick Sort (Parallel)" with length 1024 and speed 4 scaled by NLOGN_SCALE
+        push "Median of three (unstable)"
+        run sort "Stackless Quick"  with length 1024 and speed  4 scaled by NLOGN_SCALE
+        run sort "Dual Pivot Quick" with length 1024 and speed  4 scaled by NLOGN_SCALE
+        run sort "PDQ Sort"         with length 2048 and speed 10 scaled by NLOGN_SCALE
+        run sort "Aeos Quick"       with length 2048 and speed  8 scaled by NLOGN_SCALE
+        push 0
+        run sort "Log Sort" with length 2048 and speed 8 scaled by NLOGN_SCALE
+    }
+    "Merge Sorts" {
+        run sort "Merge Sort"            with length 2048 and speed 16 scaled by NLOGN_SCALE
+        run sort "Merge Sort (Parallel)" with length 2048 and speed  4
+        run sort "Bottom Up Merge"       with length 2048 and speed  8 scaled by NLOGN_SCALE
+        push "Gries-Mills"
+        run sort "Lazy Stable" with length 256 and speed 4 scaled by N_SQUARED_SCALE
+        push "Gries-Mills"
+        run sort "Rotate Merge" with length 1024 and speed 3 scaled by NLOG2N_SCALE
+        push "Gries-Mills"
+        run sort "Rotate Merge (Parallel)" with length 2048 and speed 3
+        push 256
+        run sort "Adaptive Rotate Merge" with length 2048 and speed 10 scaled by NLOGN_SCALE
+        run sort "Uranium Sort"          with length 2048 and speed  6 scaled by NLOGN_SCALE
+        run sort "Tim Sort"              with length 2048 and speed 10 scaled by NLOGN_SCALE
+        push "Gries-Mills"
+        run sort "New Shuffle Merge" with length 2048 and speed 12 scaled by C_NLOGN_SCALE
+        run sort "Andrey's Merge"    with length 2048 and speed  8 scaled by NLOGN_SCALE
+        push "Helium"
+        run sort "Buf Merge 2"             with length 2048 and speed 5 scaled by NLOGN_SCALE
+        run sort "Proportion Extend Merge" with length 2048 and speed 8 scaled by NLOGN_SCALE
+    }
+    "Block Merge Sorts" {
+        push 0
+        push "Triple Reversal"
+        run sort "Wiki Sort" with length 2048 and speed 7 scaled by C_NLOGN_SCALE
+        push 0
+        push "Gries-Mills"
+        run sort "Grail Sort" with length 2048 and speed 7 scaled by C_NLOGN_SCALE
+        push 0
+        run sort "Helium Sort"   with length 2048 and speed 5 scaled by C_NLOGN_SCALE
+        run sort "Hydrogen Sort" with length 2048 and speed 6 scaled by C_NLOGN_SCALE
+        push "Cycle Reverse"
+        run sort "Kota Sort"    with length 2048 and speed 7 scaled by C_NLOGN_SCALE
+        run sort "Ecta Sort"    with length 2048 and speed 6 scaled by C_NLOGN_SCALE
+        run sort "Lithium Sort" with length 2048 and speed 4 scaled by C_NLOGN_SCALE
+        run sort "Kita Sort"    with length 2048 and speed 6 scaled by C_NLOGN_SCALE
+        push "Cycle Reverse"
+        run sort "Chalice Sort" with length 2048 and speed 6 scaled by C_NLOGN_SCALE
+        push "Cycle Reverse"
+        push 0
+        run sort "Advanced Log Merge" with length 2048 and speed 6 scaled by NLOGN_SCALE
+        run sort "Remi Sort"          with length 1024 and speed 8 scaled by C_NLOGN_SCALE
+    }
+    "Hybrid Sorts" {
+        push "Cycle Reverse"
+        run sort "In-Place Stable Cycle" with length  256 and speed 0.5 scaled by N_SQUARED_SCALE
+        run sort "Pache Sort"            with length 1024 and speed   5 scaled by NLOGN_SCALE
+    }
+    "Distribution Sorts" {
+        run sort "Counting Sort" with length 2048 and speed 8
+        push 4
+        run sort "LSD Radix Sort" with length 2048 and speed 8
+        push 10
+        run sort "In-Place LSD Radix Sort" with length 2048 and speed 2500
+        push 4
+        run sort "MSD Radix Sort" with length 2048 and speed 8
+        push 128
+        run sort "American Flag Sort" with length 2048 and speed 8
+        run sort "Feature Sort"       with length 2048 and speed 6
+        run sort "Static Sort"        with length 2048 and speed 6
+    }
+    "Pancake Sorts" {
+        run sort "Pancake Sort"      with length  64 and speed 1 scaled by SLOW_N_SQUARED_SCALE
+        run sort "Optimized Pancake" with length 128 and speed 1 scaled by N_SQUARED_SCALE
+        run sort "Adjacency Pancake" with length  64 and speed 2 scaled by SLOW_N_SQUARED_SCALE
+    }
+    "Impractical Sorts" {
+        run sort "Stooge Sort" with length 64 and speed 7 scaled by 30
+        run sort "Bogo Sort"   with length  8 and speed 5 scaled by 64
+        run sort "Bozo Sort"   with length  8 and speed 5 scaled by 64
+    }
+}

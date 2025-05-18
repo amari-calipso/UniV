@@ -1,0 +1,21 @@
+@shuffle {
+    name: "Sorted"
+} fn sortedShuffle(array) {
+    UniV_immediateSort(array, 0, len(array));
+}
+
+@shuffle {
+    name: "Real Final Merge"
+} fn realFinalMergeShuffle(array) {
+    shuffleRandom(array, 0, len(array));
+    UniV_immediateSort(array, 0, len(array) / 2);
+    UniV_immediateSort(array, len(array) / 2, len(array));
+}
+
+@shuffle {
+    name: "Partitioned"
+} fn realFinalMergeShuffle(array) {
+    UniV_immediateSort(array, 0, len(array));
+    shuffleRandom(array, 0, len(array) / 2);
+    shuffleRandom(array, len(array) / 2, len(array));
+}

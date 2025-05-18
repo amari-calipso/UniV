@@ -1,0 +1,12 @@
+define GRAIL_SPEED 7
+
+set visual "Color Circle"
+
+run distribution "Linear" with length 2048 and 1024 unique
+run shuffle "Random"
+
+set speed GRAIL_SPEED
+
+push 0
+push "Gries-Mills"
+run sort "Grail Sort" in "Block Merge Sorts"

@@ -1,0 +1,21 @@
+describe "Runs a sequence of shuffles on a selected sorting algorithm."
+describe ""
+describe "This automation is not meant to be ran independently."
+describe "To run it, use the 'Run all shuffles' screen in the main menu"
+
+run all shuffles {
+    run shuffle "Random"
+    run shuffle "Few random"
+    run shuffle "Noisy"
+    run shuffle "Scrambled Head"
+    run shuffle "Scrambled Tail"
+    run shuffle "Partitioned"
+    run shuffle "Sorted"
+    run shuffle "Reversed"
+    run shuffle "Final Merge Pass"
+    run shuffle "Real Final Merge"
+    run shuffle "Sawtooth"
+    run shuffle "Reversed Sawtooth"
+    run shuffle "Quicksort Adversary"
+    run shuffle "Grailsort Adversary"
+}

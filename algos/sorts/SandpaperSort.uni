@@ -1,0 +1,13 @@
+@sort {
+    name:     "Sandpaper Sort",
+    listName: "Sandpaper Sort",
+    category: "Exchange Sorts"
+} fn sandpaperSort(array: List) Null {
+    for i := 0; i < len(array) - 1; i++ {
+        for j := i + 1; j < len(array); j++ {
+            if array[j] < array[i] {
+                swap(array, i, j);
+            }
+        }
+    }
+}
