@@ -21,9 +21,9 @@ Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) instal
 Jump to [releases]() if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
 
 If you're running or building from source, make sure that your machine has installed:
-    - [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
-    - [CMake](https://cmake.org/) (note that release candidate versions, marked as "rc", might not work);
-    - libclang (if you're on Windows, you can download [LLVM](https://releases.llvm.org/download.html), which contains libclang);
+- [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
+- [CMake](https://cmake.org/) (note that release candidate versions, marked as "rc", might not work);
+- libclang (if you're on Windows, you can download [LLVM](https://releases.llvm.org/download.html), which contains libclang);
 
 To run or build from source, clone the repository first, then you have two options:
 - To run directly, just use `cargo run`.
