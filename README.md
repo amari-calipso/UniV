@@ -53,7 +53,6 @@ To run or build from source, clone the repository first, then you have two optio
     - [Python](#python)
         - [What is supported and what is not supported](#what-is-supported-and-what-is-not-supported)
         - [API support](#api-support)
-        - [How to add an algorithm](#how-to-add-an-algorithm-1)
     - [Java](#java)
 - [Adding visual styles](#adding-visual-styles)
 - [Adding sound engines](#adding-sound-engines)
