@@ -4,6 +4,7 @@ import shutil
 import platform
 
 PLATFORM = platform.system()
+if PLATFORM == "Darwin": PLATFORM = "macOS"
 ARCH = platform.machine()
 
 
