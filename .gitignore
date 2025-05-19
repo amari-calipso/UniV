@@ -2,6 +2,7 @@
 /target/
 /dist/
 /resources/gen/
+/publish/
 
 # generated module files
 /src/visuals/mod.rs
