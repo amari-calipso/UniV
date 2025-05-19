@@ -10,7 +10,7 @@ class UtilsIterablesSortMerge:
         rl = b-m
         ll = m-a
         bl = 1 if this.aux is None else len(this.aux)
-        min_ = bl if rl != ll and min([bl, rl, ll]) > 8 else 1
+        min_ = bl if rl != ll and min(bl, rl, ll) > 8 else 1
         while ll > min_ and rl > min_:
             if rl < ll:
                 blockSwap(array, a, m, rl)
