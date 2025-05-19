@@ -6,6 +6,13 @@ import platform
 PLATFORM = platform.system()
 ARCH = platform.machine()
 
+
+def prepare_deps():
+    if PLATFORM == "Linux":
+        code = os.system("sudo apt install build-essential libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev")
+        if code != 0: sys.exit(1)
+
+
 def pack(cmd: str, win_cmd: str, name: str):
     if PLATFORM == "Windows":
         code = os.system(win_cmd)
@@ -27,6 +34,8 @@ if os.path.exists("publish"):
     shutil.rmtree("publish")
 
 os.mkdir("publish")
+
+prepare_deps()
 
 pack(
     "rustc dev_util.rs -o dev_util && ./dev_util --release",
