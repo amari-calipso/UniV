@@ -540,16 +540,6 @@ impl UniV {
     
                         let position = get_expect!(self.vm.bytecode).positions.get(task.ip as usize)
                             .expect("VM instruction pointer tried to access out of bounds position").clone();
-                        
-                        // TODO
-                        // println!("{:?}", self.vm.return_values);
-                        // println!("{:?}", task.stack);
-                        // println!("{:?}", task.call_stack);
-                        // println!("{:?}", task.exception_handlers_stack);
-                        // print!("{}", get_expect!(self.vm.bytecode).disassemble_one(task.ip));
-                        // println!("{}", traceback_part(&position.source, &position.filename, position.start, position.end.saturating_sub(position.start), position.line));
-                        // println!("--------");
-                        // task.environment.borrow().print_vars(0, 0);
 
                         task.pos_stack.push(position);
             

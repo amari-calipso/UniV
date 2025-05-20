@@ -31,7 +31,7 @@ To run or build from source, clone the repository first, then you have two optio
     - If building a full release:
         - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release`
         - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release`
-        - If building a "lite" release:
+    - If building a "lite" release:
         - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release-lite`
         - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release-lite`
 
