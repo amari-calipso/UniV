@@ -1634,7 +1634,7 @@ checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "univ"
-version = "2025.5.19"
+version = "2025.5.20"
 dependencies = [
  "bincode",
  "convert_case",
