@@ -46,3 +46,4 @@ tree-sitter-java = "0.23.5"
 [build-dependencies]
 convert_case = "0.6.0" # module files generation
 image = "0.25.5" # resize and reformat logo for raylib icon
+static_vcruntime = "2.0.0"

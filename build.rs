@@ -192,6 +192,7 @@ fn generate_api_layers_module(folder: &str, src: &Path) -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     println!("cargo::rerun-if-changed=src/");
     println!("cargo::rerun-if-changed=resources/");
+    static_vcruntime::metabuild();
 
     let src = PathBuf::from("src");
 
