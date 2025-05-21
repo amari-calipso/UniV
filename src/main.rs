@@ -1654,8 +1654,22 @@ impl UniV {
         let mut render_each = max(1, (frame_time * self.target_fps as f64).round() as u64);
 
         // if the amount of frames to skip gets too high, the program will get stuck
+        // so find a lower amount of frames to skip, in a "best effort" approach
         if render_each != 1 && render_each as f64 / MAX_FRAMERATE >= RENDER_EACH_MAX_SECS {
-            render_each = 1;
+            let mut a = 1;
+            let mut b = render_each;
+
+            while a < b {
+                let m = a + (b - a) / 2;
+
+                if m as f64 / MAX_FRAMERATE >= RENDER_EACH_MAX_SECS {
+                    b = m;
+                } else {
+                    a = m + 1;
+                }
+            }
+
+            render_each = a;
         }
 
         if self.frame_n % render_each == 0 {
