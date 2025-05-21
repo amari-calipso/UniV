@@ -18,7 +18,7 @@ UniV aims to be the most feature-rich, easy to use, and compatible sorting visua
 # Run or build
 Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) installed on your machine.
 
-Jump to [releases]() if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
+Jump to [releases](https://github.com/amari-calipso/UniV/releases) if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
 
 If you're running or building from source, make sure that your machine has installed:
 - [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
