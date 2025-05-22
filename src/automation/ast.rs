@@ -21,7 +21,7 @@ pub enum Statement {
     RunSort { 
         kw: Token, name: Expression, category: Option<Expression>, 
         length: Option<Expression>, speed: Option<Expression>, 
-        speed_scale: Option<Expression> 
+        speed_scale: Option<Expression>, max_length: Option<Expression>
     }
 }
 

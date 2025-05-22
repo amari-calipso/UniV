@@ -135,7 +135,7 @@ run all sorts {
     }
     "Impractical Sorts" {
         run sort "Stooge Sort" with length 64 and speed 7 scaled by 30
-        run sort "Bogo Sort"   with length  8 and speed 5 scaled by 64
-        run sort "Bozo Sort"   with length  8 and speed 5 scaled by 64
+        run sort "Bogo Sort"   with length  8 and speed 5 scaled by 64 and max length 10
+        run sort "Bozo Sort"   with length  8 and speed 5 scaled by 64 and max length 10
     }
 }

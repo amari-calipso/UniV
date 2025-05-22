@@ -248,7 +248,7 @@ impl UniV {
 
                 self.automation_interpreter.in_run_all_shuffles = false;
             }
-            Statement::RunSort { kw, name, category, length, speed, speed_scale } => {
+            Statement::RunSort { kw, name, category, length, speed, speed_scale, max_length } => {
                 let value = self.evaluate_automation_expression(name)?;
                 let name = expect_string(&value, "sort name", self)?;
 
@@ -306,16 +306,27 @@ impl UniV {
                     }
 
                     let mut length = (length as f64 * self.gui.run_all_sorts.length_mlt) as usize;
-                    let mut unique = (length as f64 / self.gui.run_all_sorts.unique_div) as usize;
-                    speed *= self.gui.run_all_sorts.length_mlt * self.gui.run_all_sorts.speed;
 
-                    if unique < RUN_ALL_UNIQUE_LIMIT{
-                        unique = RUN_ALL_UNIQUE_LIMIT;
+                    if let Some(max_length) = max_length {
+                        let max_length_value = self.evaluate_automation_expression(max_length)?;
+                        let max_length = expect_int(&max_length_value, "max length", self)? as usize;
+                        
+                        if length > max_length {
+                            length = max_length;
+                        }
                     }
 
                     if length < RUN_ALL_MIN_LENGTH {
                         length = RUN_ALL_MIN_LENGTH;
                     }
+
+                    let mut unique = (length as f64 / self.gui.run_all_sorts.unique_div) as usize;
+
+                    if unique < RUN_ALL_UNIQUE_LIMIT {
+                        unique = RUN_ALL_UNIQUE_LIMIT;
+                    }
+
+                    speed *= self.gui.run_all_sorts.length_mlt * self.gui.run_all_sorts.speed;
 
                     if self.gui.run_all_sorts.length_mlt > 1.0 {
                         speed *= speed_scale;

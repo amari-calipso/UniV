@@ -180,8 +180,9 @@ impl Parser {
         let mut length = None;
         let mut speed = None;
         let mut speed_scale = None;
+        let mut max_length = None;
         if self.match_(&[TokenType::With]) {
-            for _ in 0 .. 2 {
+            for _ in 0 .. 3 {
                 if self.match_(&[TokenType::Length]) {
                     length = Some(self.expression()?);
                 } else if self.match_(&[TokenType::Speed]) {
@@ -191,6 +192,10 @@ impl Parser {
                         self.consume(TokenType::By, "Expecting 'by' after 'scaled'")?;
                         speed_scale = Some(self.expression()?);
                     }
+                } else if self.match_(&[TokenType::Max]) {
+                    let kw = self.previous().clone();
+                    self.consume(TokenType::Length, format!("Expecting 'length' after '{}'", kw.lexeme.to_lowercase()).as_str())?;
+                    max_length = Some(self.expression()?);
                 }
 
                 if !self.match_(&[TokenType::And]) {
@@ -199,7 +204,7 @@ impl Parser {
             }
         }
         
-        Some(Statement::RunSort { kw, name, category, length, speed, speed_scale })
+        Some(Statement::RunSort { kw, name, category, length, speed, speed_scale, max_length })
     }
 
     fn block(&mut self) -> Option<Vec<Statement>> {

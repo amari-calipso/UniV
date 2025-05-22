@@ -13,6 +13,7 @@ lazy_static! {
         keywords.insert("by",           TokenType::By);
         keywords.insert("all",          TokenType::All);
         keywords.insert("and",          TokenType::And);
+        keywords.insert("max",          TokenType::Max);
         keywords.insert("pop",          TokenType::Pop);
         keywords.insert("run",          TokenType::Run);
         keywords.insert("set",          TokenType::Set);
@@ -28,6 +29,7 @@ lazy_static! {
         keywords.insert("scaled",       TokenType::Scaled);
         keywords.insert("unique",       TokenType::Unique);
         keywords.insert("visual",       TokenType::Visual);
+        keywords.insert("maximum",      TokenType::Max);
         keywords.insert("shuffle",      TokenType::Shuffle);
         keywords.insert("describe",     TokenType::Describe);
         keywords.insert("shuffles",     TokenType::Shuffles);        

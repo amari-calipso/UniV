@@ -11,7 +11,7 @@ pub enum TokenType {
     Shuffle, Distribution, With, And,
     Unique, Sort, In, Length, Speed, 
     Scaled, By, All, Sorts, Shuffles,
-    Visual, Queue, Describe,
+    Visual, Queue, Describe, Max,
 
     EOF
 }
