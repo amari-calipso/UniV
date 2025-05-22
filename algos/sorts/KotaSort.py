@@ -120,7 +120,7 @@ class KotaSort:
             k += 1
             c += 1
             if c == bLen:
-                sortingVisualizer.delay(1000)
+                sortingVisualizer.delay(250)
                 array[k-bLen].swap(array[tp])
                 tp += 1
                 if left:
@@ -144,7 +144,7 @@ class KotaSort:
         i = a+bLen
         j = t
         while i < m:
-            sortingVisualizer.delay(1000)
+            sortingVisualizer.delay(250)
             array[i].swap(array[j])
             i += bLen
             j += 1
