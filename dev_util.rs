@@ -101,6 +101,11 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     println!("Copying profiles to \"dist\" folder");
     clone_dir(&PathBuf::from("profiles"), &dist.join("profiles"))?;
 
+    println!("Copying license to \"dist\" folder");
+    fs::copy("LICENSE", &dist.join("LICENSE"))?;
+    println!("Copying font license to \"dist\" folder");
+    fs::copy(&PathBuf::from("resources").join("FONTLICENSE"), &dist.join("FONTLICENSE"))?;
+
     Ok(())
 }
 
