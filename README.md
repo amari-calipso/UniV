@@ -197,7 +197,7 @@ b: Int := 0; // You can manually specify types
 
 c: any := 0; // If the specified type is "any", the variable will be dynamically typed
 
-// Variables can be reassigned\
+// Variables can be reassigned
 a = 1; 
 c = "Hello";
 ```
