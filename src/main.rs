@@ -815,7 +815,7 @@ impl UniV {
         // random variance is added so that highlights are evenly shown.
         // for instance, if some highlights are shown on odd frames only, 
         // and the target fps is double the render fps, those highlights might never be shown
-        if self.render.speed_cnt + 1 < self.render.speed_cnt_max && self.rng.random_range(0..=1) == 1 {
+        if self.render.speed_cnt + self.rng.random_range(0..=1) < self.render.speed_cnt_max {
             self.render.speed_cnt += 1;
             self.frame_n = self.frame_n.wrapping_add(1);
             false
