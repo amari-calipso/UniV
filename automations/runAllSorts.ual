@@ -79,11 +79,11 @@ run all sorts {
         run sort "Rotate Merge (Parallel)" with length 2048 and speed 3
         push 256
         run sort "Adaptive Rotate Merge" with length 2048 and speed 10 scaled by NLOGN_SCALE
-        run sort "Uranium Sort"          with length 2048 and speed  6 scaled by NLOGN_SCALE
+        run sort "Uranium Sort"          with length 2048 and speed  7 scaled by NLOGN_SCALE
         run sort "Tim Sort"              with length 2048 and speed 10 scaled by NLOGN_SCALE
         push "Gries-Mills"
         run sort "New Shuffle Merge" with length 2048 and speed 12 scaled by C_NLOGN_SCALE
-        run sort "Andrey's Merge"    with length 2048 and speed  8 scaled by NLOGN_SCALE
+        run sort "Andrey's Merge"    with length 2048 and speed  6 scaled by NLOGN_SCALE
         push "Helium"
         run sort "Buf Merge 2"             with length 2048 and speed 5 scaled by NLOGN_SCALE
         run sort "Proportion Extend Merge" with length 2048 and speed 8 scaled by NLOGN_SCALE
@@ -96,8 +96,8 @@ run all sorts {
         push "Gries-Mills"
         run sort "Grail Sort" with length 2048 and speed 7 scaled by C_NLOGN_SCALE
         push 0
-        run sort "Helium Sort"   with length 2048 and speed 5 scaled by C_NLOGN_SCALE
-        run sort "Hydrogen Sort" with length 2048 and speed 6 scaled by C_NLOGN_SCALE
+        run sort "Helium Sort"   with length 2048 and speed 7 scaled by C_NLOGN_SCALE
+        run sort "Hydrogen Sort" with length 2048 and speed 7 scaled by C_NLOGN_SCALE
         push "Cycle Reverse"
         run sort "Kota Sort"    with length 2048 and speed 7 scaled by C_NLOGN_SCALE
         run sort "Ecta Sort"    with length 2048 and speed 6 scaled by C_NLOGN_SCALE
