@@ -932,12 +932,7 @@ impl Transform for Break<'_, '_> {
     type Transformer = ASTTransformer;
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
-        let tok;
-        if let Some(semicolon) = &self.semicolon {
-            tok = t.tok(semicolon.tok);
-        } else {
-            tok = t.tok_from_last_pos();
-        }
+        let tok = t.tok(self.tok);
 
         let mut name = tok.clone();
         name.set_lexeme("__Python_break");
@@ -971,11 +966,7 @@ impl Transform for Continue<'_, '_> {
     type Transformer = ASTTransformer;
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
-        if let Some(semicolon) = &self.semicolon {
-            Expression::Continue { kw: t.tok(semicolon.tok), value: None }
-        } else {
-            Expression::Continue { kw: t.tok_from_last_pos(), value: None }
-        }
+        Expression::Continue { kw: t.tok(self.tok), value: None }
     }
 }
 
@@ -1153,7 +1144,7 @@ impl Transform for Name<'_, '_> {
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         let name = t.base.get_var_name(self.value);
-        Expression::Variable { name: t.tok_from_last_pos_with_lexeme(&name) }
+        Expression::Variable { name: t.tok_with_lexeme(self.tok, &name) }
     }
 }
 
@@ -1549,7 +1540,7 @@ impl Transform for Integer<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal {
             value: Rc::from(self.value), // TODO: we should convert this to a valid rust-parsable int literal
-            tok: t.tok_from_last_pos(),
+            tok: t.tok(self.tok),
             kind: LiteralKind::Int
         }
     }
@@ -1561,7 +1552,7 @@ impl Transform for Float<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal {
             value: Rc::from(self.value), // TODO: we should convert this to a valid rust-parsable float literal
-            tok: t.tok_from_last_pos(),
+            tok: t.tok(self.tok),
             kind: LiteralKind::Float
         }
     }
@@ -2040,7 +2031,7 @@ impl Transform for SimpleString<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal { 
             value: Rc::from(self.value.trim_matches(|x| x == '"' || x == '\'')), 
-            tok: t.tok_from_last_pos(), 
+            tok: t.tok(self.tok), 
             kind: LiteralKind::String 
         }
     }
