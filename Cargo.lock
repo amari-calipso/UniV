@@ -1282,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "raylib_imgui_rs"
-version = "0.2.0"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68fb299a0fed8047df64c2f52cebd29b2c481947b0768227af522e847afe554a"
+checksum = "1bb18a6b24ce9d959c7c5d70b5454529ceb6819ae44f73258dc23e04c4d0f8c1"
 dependencies = [
  "imgui",
  "raylib",
