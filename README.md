@@ -35,6 +35,14 @@ To run or build from source, clone the repository first, then you have two optio
         - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release-lite`
         - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release-lite`
 
+To compile for WASM targets, you will need to properly install [emscripten](https://emscripten.org/).
+- To serve the webpage locally, run:
+    - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --run-wasm`
+    - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --run-wasm`
+- To package a release, (a `dist` folder containing the release will be created, note that **any previously existing `dist` folders will be deleted**) run:
+    - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release-wasm`
+    - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release-wasm`
+
 # Architecture
 ![](readme/architecture.png)
 

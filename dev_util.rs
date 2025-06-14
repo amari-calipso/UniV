@@ -3,6 +3,9 @@ use std::{collections::HashMap, env, fs, io::{Error, ErrorKind}, path::{Path, Pa
 // UNIX-like: rustc dev_util.rs -o dev_util && ./dev_util <command>
 // Windows: rustc dev_util.rs -o dev_util.exe && dev_util <command>
 
+const WASM_TARGET: &str = "wasm32-unknown-emscripten";
+const WASM_SERVER_PORT: &str = "8080";
+
 fn copy_dir_recursive(src: &PathBuf, dst: &Path) -> Result<(), Error> {
     for entry in fs::read_dir(src)? {
         let path = src.join(&entry?.file_name());
@@ -143,6 +146,71 @@ fn run_lite() -> Result<(), Error> {
     }    
 }
 
+fn copy_file_from(base_dir: &PathBuf, filename: &str, dist: &PathBuf) -> Result<(), Error> {
+    fs::copy(&base_dir.join(filename), dist.join(&filename))?;
+    Ok(())
+}
+
+fn release_wasm() -> Result<PathBuf, Error> {
+    compile_algos()?;
+
+    unsafe {
+        env::set_var(
+            "EMCC_CFLAGS", 
+            r#"-O3 -sUSE_GLFW=3 -sASSERTIONS=1 -sWASM=1 -sASYNCIFY -sGL_ENABLE_GET_PROC_ADDRESS=1 --no-entry"#
+        );
+    }
+
+    let mut command = Command::new("cargo");
+    command.arg("build").arg("--release");
+    command.arg("--features").arg("wasm");
+    command.arg("--target").arg(WASM_TARGET);
+
+    println!("Calling cargo");
+    if !command.status()?.success() {
+        return Err(Error::other("Build failed"));
+    }
+
+    let dist = PathBuf::from("dist");
+    if dist.exists() {
+        println!("\"dist\" folder exists. Deleting");
+        fs::remove_dir_all(&dist)?;
+    }
+
+    println!("Creating \"dist\" folder");
+    fs::create_dir(&dist)?;
+
+    println!("Copying executable to \"dist\" folder");
+    let base_dir = PathBuf::from("target").join(WASM_TARGET).join("release");
+
+    copy_file_from(&base_dir, "univ.wasm", &dist)?;
+    copy_file_from(&base_dir, "univ.js", &dist)?;
+    copy_file_from(&PathBuf::from("resources"), "univ.html", &dist)?;
+    
+    println!("Copying license to \"dist\" folder");
+    fs::copy("LICENSE", &dist.join("LICENSE"))?;
+    println!("Copying font license to \"dist\" folder");
+    fs::copy(&PathBuf::from("resources").join("FONTLICENSE"), &dist.join("FONTLICENSE"))?;
+
+    Ok(dist)
+}
+
+fn run_wasm() -> Result<(), Error> {
+    let dist = release_wasm()?;
+
+    // TODO: possibly find a way to do this without adding a dependency to python
+    let mut command = Command::new("python");
+    command.arg("-m").arg("http.server").arg(WASM_SERVER_PORT)
+           .arg("-d").arg(dist);
+
+    println!("Running UniV server");
+    if !command.status()?.success() {
+        return Err(Error::other("An error occurred while running UniV server"));
+    }
+
+    Ok(())
+}
+
 macro_rules! ok_if_notfound {
     ($expr: expr) => {
         if let Err(e) = $expr {
@@ -195,6 +263,8 @@ fn main() -> Result<(), Error> {
         "--release"      -> release(&mut args, &mut args_map, false)?
         "--release-lite" -> release_lite(&mut args, &mut args_map)?
         "--run-lite"     -> run_lite()?
+        "--release-wasm" -> release_wasm()?
+        "--run-wasm"     -> run_wasm()?
         "--clean"        -> clean()?
     };
 

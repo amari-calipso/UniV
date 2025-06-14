@@ -1,4 +1,4 @@
-// removes warnings when compiling lite version
+// removes warnings when compiling lite or wasm versions
 #![cfg_attr(feature = "lite", allow(unused))]
 
 use std::{cell::{OnceCell, RefCell}, cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, env, fmt::Debug, fs::{self, create_dir, File}, io::{Error, ErrorKind, Read, Write}, panic, path::PathBuf, process::{Child, Command, Stdio}, rc::Rc, sync::{atomic::{self, AtomicBool}, Arc, OnceLock}, thread, time::{Duration, Instant}};
@@ -14,7 +14,9 @@ use ordered_float::OrderedFloat;
 use rand::{rngs::ThreadRng, Rng};
 
 use raylib::{color::Color, ffi::{KeyboardKey, PixelFormat, TraceLogLevel}, math::{Rectangle, Vector2}, prelude::{RaylibDraw, RaylibTextureModeExt}, text::WeakFont, texture::{Image, RenderTexture2D}, RaylibHandle, RaylibThread};
-use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
+// TODO
+// #[cfg(not(feature = "wasm"))]
+// use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
 use sounds::AnySound;
 use visuals::AnyVisual;
 use visual::Visual;
@@ -144,16 +146,19 @@ struct Render {
     pub ffmpeg: OnceCell<FFMpeg>
 }
 
-struct Audio {
-    pub _stream: OutputStream,
-    pub handle:  OutputStreamHandle,
-}
+// TODO
+// #[cfg(not(feature = "wasm"))]
+// struct Audio {
+//     pub _stream: OutputStream,
+//     pub handle:  OutputStreamHandle,
+// }
 
-impl std::fmt::Debug for Audio {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Audio").finish()
-    }
-}
+// #[cfg(not(feature = "wasm"))]
+// impl std::fmt::Debug for Audio {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("Audio").finish()
+//     }
+// }
 
 pub type LanguageLayerFn = fn(String, Rc<str>) -> Result<Vec<Expression>, Vec<String>>;
 
@@ -220,7 +225,11 @@ pub struct UniV {
     rl_thread: OnceCell<RaylibThread>,
     /// Texture used as framebuffer for render mode
     render_texture: OnceCell<RenderTexture2D>,
-    audio: OnceCell<Audio>,
+
+    // TODO
+    // #[cfg(not(feature = "wasm"))]
+    // audio: OnceCell<Audio>,
+
     mixer: SoundMixer,
     /// Represents the last timestamp in which a frame played a sound in real time mode.
     /// Used to avoid too many sounds playing at once
@@ -319,7 +328,11 @@ impl UniV {
             rl_handle: OnceCell::new(),
             rl_thread: OnceCell::new(),
             render_texture: OnceCell::new(),
-            audio: OnceCell::new(),
+
+            // TODO
+            // #[cfg(not(feature = "wasm"))]
+            // audio: OnceCell::new(),
+
             mixer: SoundMixer::new(),
             sound_timestamp: Instant::now(),
             audio_output_buf: Vec::new(),
@@ -1601,33 +1614,35 @@ impl UniV {
     }
 
     fn play_sound(&mut self) {
-        if self.audio.get().is_some() {
-            let sound_duration = max(
-                OrderedFloat(REALTIME_UNIT_SAMPLE_DURATION),
-                max(
-                    OrderedFloat(1.0 / self.target_fps as f64),
-                    OrderedFloat(self.tmp_sleep)
-                )
-            ).0;
+        // TODO
+        // #[cfg(not(feature = "wasm"))]
+        // if self.audio.get().is_some() {
+        //     let sound_duration = max(
+        //         OrderedFloat(REALTIME_UNIT_SAMPLE_DURATION),
+        //         max(
+        //             OrderedFloat(1.0 / self.target_fps as f64),
+        //             OrderedFloat(self.tmp_sleep)
+        //         )
+        //     ).0;
 
-            // if the sound is a long one (suggesting a longer frame due to a temporary sleep),
-            // play it ignoring the frametime limit
-            if sound_duration <= REALTIME_UNIT_SAMPLE_DURATION &&
-                self.sound_timestamp.elapsed().as_secs_f64() < REFERENCE_FRAMETIME
-            {
-                return;
-            }
+        //     // if the sound is a long one (suggesting a longer frame due to a temporary sleep),
+        //     // play it ignoring the frametime limit
+        //     if sound_duration <= REALTIME_UNIT_SAMPLE_DURATION &&
+        //         self.sound_timestamp.elapsed().as_secs_f64() < REFERENCE_FRAMETIME
+        //     {
+        //         return;
+        //     }
 
-            let samples_to_take = self.mix_sound(sound_duration);
-            self.mixer.get(samples_to_take);
-            self.mixer.cleanup();
+        //     let samples_to_take = self.mix_sound(sound_duration);
+        //     self.mixer.get(samples_to_take);
+        //     self.mixer.cleanup();
 
-            let sink = Sink::try_new(&get_expect!(self.audio).handle).unwrap();
-            sink.append(SamplesBuffer::new(SOUND_CHANNELS, SAMPLE_RATE, self.mixer.output.clone()));
-            sink.detach();
+        //     let sink = Sink::try_new(&get_expect!(self.audio).handle).unwrap();
+        //     sink.append(SamplesBuffer::new(SOUND_CHANNELS, SAMPLE_RATE, self.mixer.output.clone()));
+        //     sink.detach();
 
-            self.sound_timestamp = Instant::now();
-        }
+        //     self.sound_timestamp = Instant::now();
+        // }
     }
 
     fn clear_highlights_if_precise(&mut self) {
@@ -2352,20 +2367,21 @@ impl UniV {
     }
 
     fn init_audio(&mut self) {
-        if self.audio.get().is_none() {
-            log!(TraceLogLevel::LOG_INFO, "Initializing audio");
-            match OutputStream::try_default() {
-                Ok((_stream, handle)) => {
-                    self.audio.set(Audio { _stream, handle }).expect("Audio OnceCell was already set");
-                    log!(TraceLogLevel::LOG_INFO, "Audio was initialized successfully");
-                }
-                Err(e) => {
-                    log!(TraceLogLevel::LOG_ERROR, "Could not initialize audio");
-                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e);
-                    log!(TraceLogLevel::LOG_WARNING, "Proceeding with no audio");
-                }
-            }
-        }
+        // #[cfg(not(feature = "wasm"))]
+        // if self.audio.get().is_none() {
+        //     log!(TraceLogLevel::LOG_INFO, "Initializing audio");
+        //     match OutputStream::try_default() {
+        //         Ok((_stream, handle)) => {
+        //             self.audio.set(Audio { _stream, handle }).expect("Audio OnceCell was already set");
+        //             log!(TraceLogLevel::LOG_INFO, "Audio was initialized successfully");
+        //         }
+        //         Err(e) => {
+        //             log!(TraceLogLevel::LOG_ERROR, "Could not initialize audio");
+        //             log!(TraceLogLevel::LOG_ERROR, "    > {}", e);
+        //             log!(TraceLogLevel::LOG_WARNING, "Proceeding with no audio");
+        //         }
+        //     }
+        // }
     }
 
     pub fn loading_message(&mut self, msg: &str) -> Result<(), ExecutionInterrupt> {
@@ -2379,7 +2395,15 @@ impl UniV {
             .size(self.settings.resolution[0] as i32, self.settings.resolution[1] as i32)
             .title(format!(
                 "UniV {}v{}",
-                if cfg!(feature = "lite") { "lite " } else { "" },
+                {
+                    if cfg!(feature = "wasm") {
+                        "web "
+                    } else if cfg!(feature = "lite") { 
+                        "lite " 
+                    } else { 
+                        "" 
+                    }
+                },
                 VERSION
             ).as_str())
             .log_level(LOG_LEVEL)
@@ -2388,16 +2412,18 @@ impl UniV {
         self.rl_handle.set(handle).expect("Raylib handle OnceCell was already set");
         self.rl_thread.set(thread).expect("Raylib thread OnceCell was already set");
 
-        log!(TraceLogLevel::LOG_INFO, "Loading icon");
-        match Image::load_image_from_mem(LOGO_FORMAT, LOGO) {
-            Ok(mut image) => {
-                image.set_format(PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-                get_expect_mut!(self.rl_handle).set_window_icon(image);
-            }
-            Err(e) => {
-                log!(TraceLogLevel::LOG_ERROR, "Could not load icon");
-                log!(TraceLogLevel::LOG_ERROR, "    > {}", e);
-                log!(TraceLogLevel::LOG_WARNING, "Proceeding with no icon");
+        if cfg!(not(feature = "wasm")) {
+            log!(TraceLogLevel::LOG_INFO, "Loading icon");
+            match Image::load_image_from_mem(LOGO_FORMAT, LOGO) {
+                Ok(mut image) => {
+                    image.set_format(PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    get_expect_mut!(self.rl_handle).set_window_icon(image);
+                }
+                Err(e) => {
+                    log!(TraceLogLevel::LOG_ERROR, "Could not load icon");
+                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e);
+                    log!(TraceLogLevel::LOG_WARNING, "Proceeding with no icon");
+                }
             }
         }
 
@@ -2411,7 +2437,9 @@ impl UniV {
         self.sounds.sort_by(|a, b| a.name().cmp(b.name()));
         log!(TraceLogLevel::LOG_INFO, "Loaded {} sounds", self.sounds.len());
 
-        self.load_settings(true);
+        if cfg!(not(feature = "wasm")) {
+            self.load_settings(true);
+        }
 
         if let Err(e) = self.set_window_size() {
             match e {
@@ -3340,6 +3368,7 @@ fn compile_algos() -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     let args_map: HashMap<String, usize> = env::args().enumerate().map(|(i, x)| (x, i)).collect();
 
+    #[cfg(not(feature = "wasm"))]
     PROGRAM_DIR.set({
         match env::current_exe() {
             Ok(path) => {
