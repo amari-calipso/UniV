@@ -202,14 +202,21 @@ impl Gui {
     }
 
     pub fn run(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+        let refresh_rate = get_monitor_refresh_rate(get_current_monitor()) as u32;
+
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
-        rl.set_target_fps(get_monitor_refresh_rate(get_current_monitor()) as u32);
+        rl.set_target_fps(refresh_rate);
         rl.set_trace_log(LOG_LEVEL);
 
         let mut quit = true;
 
         while !rl.window_should_close() {
             get_expect_mut!(self.renderer).update(&mut self.imgui, rl);
+
+            // fixes issues with rendering in WASM
+            if self.imgui.io().delta_time <= 0.0 {
+                self.imgui.io_mut().delta_time = 1.0 / refresh_rate as f32;
+            }
 
             let done = (self.build_fn)(self);
 

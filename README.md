@@ -1,6 +1,7 @@
 ![](resources/logo.png)
 
 # UniV - The unifying sorting visualization software
+## NOTE: This branch contains an experiment for a web (WASM) version, but this is not practical due to the limited performance of WASM. This should be considered as a reference for how to do this, in case the infrastructure improves and we decide to create something like this. TODO: support sound
 UniV aims to be the most feature-rich, easy to use, and compatible sorting visualization software, all while being one of the fastest and most capable.
 
 # What does "UniV" mean?

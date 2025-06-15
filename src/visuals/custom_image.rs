@@ -92,6 +92,11 @@ visual! {
     }
 
     init(_shared, gui, rl, thread) {
+        if cfg!(feature = "wasm") {
+            self.load_default_image(rl);
+            return Ok(());
+        }
+
         loop {
             if custom_image_config_file!().exists() {
                 let config = {

@@ -157,7 +157,10 @@ fn release_wasm() -> Result<PathBuf, Error> {
     unsafe {
         env::set_var(
             "EMCC_CFLAGS", 
-            r#"-O3 -sUSE_GLFW=3 -sASSERTIONS=1 -sWASM=1 -sASYNCIFY -sGL_ENABLE_GET_PROC_ADDRESS=1 --no-entry"#
+            concat!(
+                "-O3 -sUSE_GLFW=3 -sFORCE_FILESYSTEM=1 -sALLOW_MEMORY_GROWTH=1 ",
+                "-sASSERTIONS=1 -sWASM=1 -sASYNCIFY -sGL_ENABLE_GET_PROC_ADDRESS=1 --no-entry"
+            )
         );
     }
 

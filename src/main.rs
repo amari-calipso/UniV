@@ -49,8 +49,13 @@ const COMPILATION_HEADER: &str = include_str!("header.uni");
 #[cfg(feature = "lite")]
 const BYTECODE: &[u8] = include_bytes!("../algos.unib");
 
-const RUN_ALL_SORTS_FILENAME: &str = "runAllSorts.ual";
-const RUN_ALL_SHUFFLES_FILENAME: &str = "runAllShuffles.ual";
+macro_rules! run_all_sorts_filename {
+    () => { "runAllSorts.ual" };
+}
+
+macro_rules! run_all_shuffles_filename {
+    () => { "runAllShuffles.ual" };
+}
 
 const SAMPLE_RATE: u32 = 48000;
 const POLYPHONY_LIMIT: usize = 4;
@@ -2254,25 +2259,42 @@ impl UniV {
         log!(TraceLogLevel::LOG_INFO, "Loaded {} rotations", self.rotations.len());
         log!(TraceLogLevel::LOG_INFO, "Loaded {} shuffles", self.shuffles.len());
         log!(TraceLogLevel::LOG_INFO, "Loaded {} sorts", sort_amt);
+        
+        #[cfg(not(feature = "wasm"))]
         self.init_automation_shuffle();
+
         self.init_gui_algos();
 
-        match self.try_load_automation(RUN_ALL_SORTS_FILENAME) {
-            Err(e) => errors.push(e),
-            Ok(automation) => {
-                if let Some(automation) = automation {
-                    self.run_all_sorts.take();
-                    self.run_all_sorts.set(automation).unwrap();
+        if cfg!(feature = "wasm") {
+            self.run_all_sorts.take();
+            self.run_all_sorts.set(AutomationFile::new(
+                Rc::from(include_str!(concat!("../automations/", run_all_sorts_filename!()))), 
+                Rc::from(run_all_sorts_filename!())
+            )).unwrap();
+
+            self.run_all_sorts.take();
+            self.run_all_sorts.set(AutomationFile::new(
+                Rc::from(include_str!(concat!("../automations/", run_all_shuffles_filename!()))), 
+                Rc::from(run_all_shuffles_filename!())
+            )).unwrap();
+        } else {
+            match self.try_load_automation(run_all_sorts_filename!()) {
+                Err(e) => errors.push(e),
+                Ok(automation) => {
+                    if let Some(automation) = automation {
+                        self.run_all_sorts.take();
+                        self.run_all_sorts.set(automation).unwrap();
+                    }
                 }
             }
-        }
 
-        match self.try_load_automation(RUN_ALL_SHUFFLES_FILENAME) {
-            Err(e) => errors.push(e),
-            Ok(automation) => {
-                if let Some(automation) = automation {
-                    self.run_all_shuffles.take();
-                    self.run_all_shuffles.set(automation).unwrap();
+            match self.try_load_automation(run_all_shuffles_filename!()) {
+                Err(e) => errors.push(e),
+                Ok(automation) => {
+                    if let Some(automation) = automation {
+                        self.run_all_shuffles.take();
+                        self.run_all_shuffles.set(automation).unwrap();
+                    }
                 }
             }
         }
@@ -3019,7 +3041,7 @@ impl UniV {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
                             "Error",
-                            format!("Could not find '{}' automation file", RUN_ALL_SORTS_FILENAME).as_str()
+                            format!("Could not find '{}' automation file", run_all_sorts_filename!()).as_str()
                         ).unwrap();
                         self.run_gui()?;
                         continue;
@@ -3097,7 +3119,7 @@ impl UniV {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
                             "Error",
-                            format!("Could not find '{}' automation file", RUN_ALL_SHUFFLES_FILENAME).as_str()
+                            format!("Could not find '{}' automation file", run_all_shuffles_filename!()).as_str()
                         ).unwrap();
                         self.run_gui()?;
                         continue;
@@ -3154,6 +3176,13 @@ impl UniV {
                     }
                 }
                 3 => {
+                    if cfg!(feature = "wasm") {
+                        self.gui.build_fn = Gui::popup;
+                        self.gui.popup.set("Unavailable", "This functionality is only available on the desktop version of UniV").unwrap();
+                        self.run_gui()?;
+                        continue;
+                    }
+
                     let mut last_index = 0;
                     let automations = self.list_automations()?;
 
@@ -3254,7 +3283,10 @@ impl UniV {
 
                             if self.settings != self.gui.settings.object {
                                 self.settings = self.gui.settings.object.clone();
-                                self.try_save_settings();
+
+                                if cfg!(not(feature = "wasm")) {
+                                    self.try_save_settings();
+                                }
                             }
 
                             if new_res {

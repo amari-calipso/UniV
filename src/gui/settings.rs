@@ -140,8 +140,10 @@ impl Settings {
         self.back = false;
         self.curr_sound = sounds.binary_search(&Rc::from(self.object.sound.as_str())).unwrap();
 
-        self.load_profiles();
-        self.load_configs();
+        if cfg!(not(feature = "wasm")) {
+            self.load_profiles();
+            self.load_configs();
+        }
     }
 }
 
@@ -204,101 +206,113 @@ impl Gui {
                 imgui_centered_text!(ui, "Sound");
                 imgui_spaced_separator!(ui);
 
-                ui.checkbox("Play sound", &mut self.settings.object.play_sound);
-                ui.checkbox("Reverb and chorus", &mut self.settings.object.reverb);
-                if ui.is_item_hovered() {
-                    ui.tooltip(|| {
-                        ui.text("Hints the sound engine to activate reverb and chorus. The engine may ignore this");
-                    });
+                if cfg!(feature = "wasm") {
+                    ui.text("Sound is currently not available in UniV web");
+                } else {
+                    ui.checkbox("Play sound", &mut self.settings.object.play_sound);
+                    ui.checkbox("Reverb and chorus", &mut self.settings.object.reverb);
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            ui.text("Hints the sound engine to activate reverb and chorus. The engine may ignore this");
+                        });
+                    }
+
+                    ui.spacing();
+
+                    if ui.button("Setup") {
+                        self.settings.sound_setup = true;
+                        quit = true;
+                    }
+
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            ui.text("Runs the preparation script for the selected sound engine");
+                        });
+                    }
+                    
+                    ui.same_line();
+
+                    ui.combo_simple_string("Sound", &mut self.settings.curr_sound, &self.sounds);
                 }
-
-                ui.spacing();
-
-                if ui.button("Setup") {
-                    self.settings.sound_setup = true;
-                    quit = true;
-                }
-
-                if ui.is_item_hovered() {
-                    ui.tooltip(|| {
-                        ui.text("Runs the preparation script for the selected sound engine");
-                    });
-                }
-                
-                ui.same_line();
-
-                ui.combo_simple_string("Sound", &mut self.settings.curr_sound, &self.sounds);
 
                 ui.spacing();
                 imgui_centered_text!(ui, "Render mode");
                 imgui_spaced_separator!(ui);
 
-                ui.checkbox("Enable (off is real time mode)", &mut self.settings.object.render);
-                if ui.is_item_hovered() {
-                    ui.tooltip(|| {
-                        ui.text("Enables render mode");
-                    });
-                }
+                if cfg!(feature = "wasm") {
+                    ui.text("Render mode is only available on the desktop version of UniV");
+                } else {
+                    ui.checkbox("Enable (off is real time mode)", &mut self.settings.object.render);
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            ui.text("Enables render mode");
+                        });
+                    }
 
-                ui.input_scalar("FPS", &mut self.settings.object.render_fps).build();
-                if ui.is_item_hovered() {
-                    ui.tooltip(|| {
-                        ui.text("Sets the video output FPS for render mode");
-                    });
-                }
+                    ui.input_scalar("FPS", &mut self.settings.object.render_fps).build();
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            ui.text("Sets the video output FPS for render mode");
+                        });
+                    }
 
-                ui.input_scalar("Bitrate (kbps)", &mut self.settings.object.bitrate).build();
-                ui.combo_simple_string("Profile", &mut self.settings.curr_profile, &self.settings.profiles);
+                    ui.input_scalar("Bitrate (kbps)", &mut self.settings.object.bitrate).build();
+                    ui.combo_simple_string("Profile", &mut self.settings.curr_profile, &self.settings.profiles);
+                }
 
                 ui.spacing();
                 imgui_centered_text!(ui, "Other");
                 imgui_spaced_separator!(ui);
-
-                if cfg!(not(feature = "lite")) {
-                    if ui.button("Reload algorithms") {
-                        self.settings.reload_algos = true;
-                        quit = true;
-                    }
-                }
-
-                ui.spacing();
-
-                let config_name = Rc::clone(&self.settings.configs[self.settings.curr_config]);
-
-                if self.settings.reset_pressed && config_name.as_ref() != "<no configs>" {
-                    if ui.button("Cancel deletion") {
-                        self.settings.reset_pressed = false;
-                    }
+                
+                if cfg!(feature = "wasm") {
+                    ui.text("These settings are only available on the desktop version of UniV");
                 } else {
-                    if ui.button("Reset configuration") {
-                        self.settings.reset_pressed = true;
+                    if cfg!(not(feature = "lite")) {
+                        if ui.button("Reload algorithms") {
+                            self.settings.reload_algos = true;
+                            quit = true;
+                        }
                     }
 
-                    if ui.is_item_hovered() {
-                        ui.tooltip(|| {
-                            ui.text("Delete settings for the selected module");
-                        });
-                    }
-                }
+                    ui.spacing();
 
-                ui.same_line();
-                ui.combo_simple_string("##config", &mut self.settings.curr_config, &self.settings.configs);
+                    let config_name = Rc::clone(&self.settings.configs[self.settings.curr_config]);
 
-                if self.settings.reset_pressed && 
-                    config_name.as_ref() != "<no configs>" && 
-                    ui.button(format!("Confirm deletion for '{config_name}'").as_str()) 
-                {
-                    self.settings.reset_pressed = false;
-                    
-                    if let Err(e) = fs::remove_file(config_dir!().join(format!("{config_name}.json"))) {
-                        log!(TraceLogLevel::LOG_ERROR, "Error deleting configuration");
-                        log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                    if self.settings.reset_pressed && config_name.as_ref() != "<no configs>" {
+                        if ui.button("Cancel deletion") {
+                            self.settings.reset_pressed = false;
+                        }
                     } else {
-                        self.settings.config_deleted = true;
-                        self.settings.load_configs();
+                        if ui.button("Reset configuration") {
+                            self.settings.reset_pressed = true;
+                        }
+
+                        if ui.is_item_hovered() {
+                            ui.tooltip(|| {
+                                ui.text("Delete settings for the selected module");
+                            });
+                        }
+                    }
+
+                    ui.same_line();
+                    ui.combo_simple_string("##config", &mut self.settings.curr_config, &self.settings.configs);
+
+                    if self.settings.reset_pressed && 
+                        config_name.as_ref() != "<no configs>" && 
+                        ui.button(format!("Confirm deletion for '{config_name}'").as_str()) 
+                    {
+                        self.settings.reset_pressed = false;
+                        
+                        if let Err(e) = fs::remove_file(config_dir!().join(format!("{config_name}.json"))) {
+                            log!(TraceLogLevel::LOG_ERROR, "Error deleting configuration");
+                            log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                        } else {
+                            self.settings.config_deleted = true;
+                            self.settings.load_configs();
+                        }
                     }
                 }
-
+                
                 ui.set_cursor_pos([ui.cursor_pos()[0], ui.window_content_region_max()[1] - Gui::BACK_BUTTON_Y_SIZE]);
                 if ui.button("Back") {
                     self.settings.back = true;
