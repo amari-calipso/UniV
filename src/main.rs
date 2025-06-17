@@ -1,5 +1,6 @@
-// removes warnings when compiling lite version
+// removes warnings when compiling lite or dev versions
 #![cfg_attr(feature = "lite", allow(unused))]
+#![cfg_attr(feature = "dev", allow(unused))]
 
 use std::{cell::{OnceCell, RefCell}, cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, env, fmt::Debug, fs::{self, create_dir, File}, io::{Error, ErrorKind, Read, Write}, panic, path::PathBuf, process::{Child, Command, Stdio}, rc::Rc, sync::{atomic::{self, AtomicBool}, Arc, OnceLock}, thread, time::{Duration, Instant}};
 use algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort};
@@ -23,6 +24,8 @@ use highlights::HighlightInfo;
 use value::{Value, VerifyValue};
 use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
+
+#[cfg(feature = "dev")]
 use bincode::encode_into_std_write;
 
 #[cfg(feature = "lite")]
@@ -3310,7 +3313,7 @@ impl Drop for UniV {
     }
 }
 
-#[cfg(not(feature = "lite"))]
+#[cfg(feature = "dev")]
 fn compile_algos() -> Result<(), Error> {
     let mut errors = Vec::new();
     let bytecode = UniV::new().compile_algos(&mut errors);
@@ -3366,7 +3369,7 @@ fn main() -> Result<(), Error> {
         }
     }).expect("Program directory OnceCell was already set");
 
-    #[cfg(not(feature = "lite"))]
+    #[cfg(feature = "dev")]
     if args_map.contains_key("--compile-algos") {
         return compile_algos();
     }
@@ -3378,6 +3381,8 @@ fn main() -> Result<(), Error> {
         default_hook(info);
     }));
 
+    #[cfg(not(feature = "dev"))] 
     UniV::new().init_run();
+
     Ok(())
 }

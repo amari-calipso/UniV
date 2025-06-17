@@ -1,7 +1,6 @@
 use core::str;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use bincode::{decode_from_reader, encode_into_writer, impl_borrow_decode, Decode, Encode};
 use enum_dispatch::enum_dispatch;
 
 use crate::{compiler::type_system::UniLType, univm::{environment::Environment, Task, VM_TASKS}, UniV};
@@ -106,8 +105,11 @@ impl UniLValue {
     }
 }
 
-impl Encode for UniLValue {
+#[cfg(feature = "dev")]
+impl bincode::Encode for UniLValue {
     fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        use bincode::encode_into_writer;
+
         let mut writer = encoder.writer();
         match self {
             UniLValue::Null => {
@@ -132,8 +134,11 @@ impl Encode for UniLValue {
     }
 }
 
-impl<C> Decode<C> for UniLValue {
+#[cfg(feature = "lite")]
+impl<C> bincode::Decode<C> for UniLValue {
     fn decode<D: bincode::de::Decoder<Context = C>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        use bincode::decode_from_reader;
+
         let mut reader = decoder.reader();
         let type_: u8 = decode_from_reader(&mut reader, bincode::config::standard())?;
 
@@ -147,7 +152,8 @@ impl<C> Decode<C> for UniLValue {
     }
 }
 
-impl_borrow_decode!(UniLValue);
+#[cfg(feature = "lite")]
+bincode::impl_borrow_decode!(UniLValue);
 
 #[enum_dispatch(AnyCallable)]
 pub trait Callable {

@@ -1,7 +1,5 @@
 use std::{cmp::max, rc::Rc};
 
-use bincode::{Decode, Encode};
-
 use crate::unil::{ast::{Expression, LiteralKind}, scanner::KEYWORDS, tokens::Token};
 
 #[cfg(not(feature = "lite"))]
@@ -76,7 +74,9 @@ pub fn traceback_part(source: &str, filename: &str, pos: usize, len: usize, line
     output
 }
 
-#[derive(Clone, Encode, Decode)]
+#[derive(Clone)]
+#[cfg_attr(feature = "dev", derive(bincode::Encode))]
+#[cfg_attr(feature = "lite", derive(bincode::Decode))]
 pub struct AstPos {
     pub source: Rc<str>,
     pub filename: Rc<str>,

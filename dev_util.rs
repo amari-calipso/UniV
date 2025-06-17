@@ -113,7 +113,8 @@ fn compile_algos() -> Result<(), Error> {
     println!("Compiling algorithms into bytecode");
 
     let mut command = Command::new("cargo");
-    command.arg("run").arg("--").arg("--compile-algos");
+    command.arg("run").arg("--features").arg("dev")
+        .arg("--").arg("--compile-algos");
 
     if !command.status()?.success() {
         return Err(Error::other("Compilation failed"));

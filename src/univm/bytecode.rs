@@ -1,12 +1,12 @@
-use std::{collections::HashMap, fmt::Display, rc::Rc};
-
-use bincode::{decode_from_reader, encode_into_writer, error::DecodeError, Decode, Encode};
+use std::{fmt::Display, rc::Rc};
 
 use crate::utils::lang::AstPos;
 
 use super::object::UniLValue;
 
-#[derive(Clone, Debug, Encode, Decode)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "dev", derive(bincode::Encode))]
+#[cfg_attr(feature = "lite", derive(bincode::Decode))]
 pub enum Instruction {
     LoadName(u64),
     DefineName(u64),
@@ -215,8 +215,12 @@ impl Bytecode {
     }
 }
 
-impl Encode for Bytecode {
+#[cfg(feature = "dev")]
+impl bincode::Encode for Bytecode {
     fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        use bincode::encode_into_writer;
+        use std::collections::HashMap;
+
         let mut writer = encoder.writer();
         encode_into_writer(&self.instructions, &mut writer, bincode::config::standard())?;
         encode_into_writer(&self.constants, &mut writer, bincode::config::standard())?;
@@ -254,8 +258,12 @@ impl Encode for Bytecode {
     }
 }
 
-impl<C> Decode<C> for Bytecode {
+#[cfg(feature = "lite")]
+impl<C> bincode::Decode<C> for Bytecode {
     fn decode<D: bincode::de::Decoder<Context = C>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        use bincode::{decode_from_reader, error::DecodeError};
+        use std::collections::HashMap;
+
         let mut reader = decoder.reader();
         let instructions = decode_from_reader(&mut reader, bincode::config::standard())?;
         let constants = decode_from_reader(&mut reader, bincode::config::standard())?;
