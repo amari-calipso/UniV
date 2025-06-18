@@ -331,10 +331,12 @@ impl Gui {
             });
 
         if quit && !self.settings.back {
-            let profile = self.settings.profiles[self.settings.curr_profile].to_string();
+            if cfg!(not(feature = "wasm")) {
+                let profile = self.settings.profiles[self.settings.curr_profile].to_string();
 
-            if profile.as_str() != "<no profiles>" {
-                self.settings.object.profile = profile;
+                if profile.as_str() != "<no profiles>" {
+                    self.settings.object.profile = profile;
+                }
             }
             
             self.settings.object.sound = self.sounds[self.settings.curr_sound].to_string();
