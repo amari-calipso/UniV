@@ -57,7 +57,7 @@ visual! {
             let y = (value * self.dots_visual.base.line_length_mlt) as i32;
             draw.draw_rectangle(
                 x as i32, 
-                self.dots_visual.base.resolution_y - y, 
+                self.dots_visual.base.resolution_y - y - width as i32, 
                 width as i32, 
                 width as i32, 
                 color
@@ -97,7 +97,7 @@ visual! {
             let y = (value * self.dots_visual.base.aux_line_length_mlt) as i32;
             draw.draw_rectangle(
                 x as i32, 
-                self.dots_visual.base.aux_resolution_y - y, 
+                self.dots_visual.base.aux_resolution_y - y - width as i32, 
                 width as i32, 
                 width as i32, 
                 color
