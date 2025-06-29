@@ -73,9 +73,17 @@ class UtilsIterablesSortMerge:
             array[right].write(this.aux[aux])
             right -= 1
             aux -= 1
+        
+    def checkMergeBounds(this, array, a, m, b):
+        if array[m-1] <= array[m]:
+            return True
+        elif array[a] > array[b-1]:
+            this.rotate(array, a, m, b)
+            return True
+        return False
 
     def mergeInPlace(this, array, a, m, b, check):
-        if checkMergeBounds(array, a, m, b, this.rotate):
+        if this.checkMergeBounds(array, a, m, b):
             return
         if check:
             b = lrBinarySearch(array, m, b, array[m-1].read(), True)
