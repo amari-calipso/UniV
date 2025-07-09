@@ -2298,6 +2298,17 @@ impl UniV {
         Ok(())
     }
 
+    fn move_window_on_screen(&mut self) {
+        // fixes some weird behavior where the top bar with buttons will be hidden 
+        // if the window resolution is a bit too big for the screen
+
+        let rl = get_expect_mut!(self.rl_handle);
+        let pos = rl.get_window_position();
+        if pos.y < 0.0 {
+            rl.set_window_position(pos.x as i32, 0);
+        }
+    }
+
     fn set_window_size(&mut self) -> Result<(), ExecutionInterrupt> {
         {
             let rl = get_expect_mut!(self.rl_handle);
@@ -2308,7 +2319,8 @@ impl UniV {
 
             let _ = rl.begin_drawing(get_expect!(self.rl_thread)); // without this, get_screen_height() and get_screen_width() return the old value
         }
-
+        
+        self.move_window_on_screen();
         self.compute_font_size();
         self.init_gui();
         self.loading_message("Preparing...")?;

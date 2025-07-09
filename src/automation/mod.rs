@@ -385,7 +385,7 @@ impl UniV {
 
                     if let AutomationMode::RunCategory(selected) = &self.automation_interpreter.mode {
                         if run_all_category.as_ref() != selected.as_ref() {
-                            return Ok(());
+                            continue;
                         }
                     }
 
