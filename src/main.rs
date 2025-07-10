@@ -2995,7 +2995,8 @@ impl UniV {
                 f.write_all(&decoded_data)
                     .map_err(|e| e.to_string())?;
 
-                if cfg!(unix) {
+                #[cfg(unix)]
+                {
                     use std::os::unix::fs::PermissionsExt;
                     // make file readable and executable
                     fs::set_permissions(output_file, fs::Permissions::from_mode(0o555))
