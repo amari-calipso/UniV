@@ -2195,6 +2195,8 @@ impl UniV {
                 Err(e) => errors.extend(e),
             }
         }
+        
+        unil::swap_recognition::process(&mut toplevel_ast);
 
         match compiler::compile(&toplevel_ast, &self.vm.globals.borrow()) {
             Ok(bytecode) => Some(bytecode),

@@ -1001,6 +1001,47 @@ impl Transform for Expr<'_, '_> {
 macro_rules! tuple_assign {
     ($slf: ident, $t: ident, $op: ident, $tuple: ident) => {
         {
+            let value = $slf.value.to_ast($t);
+
+            // look for array[a], array[b] = array[b], array[a] pattern and replace it with swap(array, a, b)
+            if let Expression::List { items, .. } = &value {
+                if $tuple.elements.len() == 2 && items.len() == 2 {
+                    let element0 = $tuple.elements[0].to_ast($t);
+                    let element1 = $tuple.elements[1].to_ast($t);
+
+                    if let Expression::Subscript { subscripted: left_sub, index: left_idx, .. } = &element0 {
+                        if let Expression::Subscript { subscripted: right_sub, index: right_idx, .. } = &element1 {
+                            if element0.equals(&items[1]) && element1.equals(&items[0]) && left_sub.equals(&right_sub) {
+                                return Expression::Block { 
+                                    opening_brace: $op.clone(), 
+                                    expressions: vec![
+                                        // subscript operation would normally be evaluated 4 times, so clone it to keep side effects (if any)
+                                        *left_sub.clone(),
+                                        *left_sub.clone(),
+                                        *left_sub.clone(), 
+                                        // left and right indices would be evaluated 1 additional time each, so do the same
+                                        *left_idx.clone(),
+                                        *right_idx.clone(),
+                                        // now output the call itself
+                                        Expression::Call { 
+                                            callee: Box::new(Expression::Variable { 
+                                                name: {
+                                                    let mut name = $op.clone();
+                                                    name.set_lexeme("swap");
+                                                    name
+                                                }
+                                            }),
+                                            paren: $op, 
+                                            args: vec![*left_sub.clone(), *left_idx.clone(), *right_idx.clone()] 
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             let tmp = $t.base.tmp_var();
 
             let mut name = $op.clone();
@@ -1017,7 +1058,7 @@ macro_rules! tuple_assign {
                     Expression::Assign {
                         target: tmp_var.clone(),
                         op: $op.clone(),
-                        value: Box::new($slf.value.to_ast($t)),
+                        value: Box::new(value),
                         type_spec: None
                     }
                 ].into_iter().chain($tuple.elements.iter().enumerate().map(|(i, x)| {

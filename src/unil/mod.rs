@@ -10,6 +10,8 @@ pub mod ast;
 pub mod scanner;
 mod parser;
 
+pub mod swap_recognition;
+
 pub fn parse(source: String, filename: Rc<str>) -> Result<Vec<Expression>, Vec<String>> {
     let mut scanner = Scanner::new(&source, filename);
     scanner.scan_tokens();
