@@ -216,6 +216,7 @@ impl Transform for FunctionDef<'_, '_> {
                         "sort" => {
                             if args.len() < 3 || args.len() > 4 {
                                 ast_error!(t.base, decorator, format!("Expecting 3 or 4 arguments for sort decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             let mut fields = vec![
@@ -256,6 +257,7 @@ impl Transform for FunctionDef<'_, '_> {
                         "shuffle" => {
                             if args.len() != 1 {
                                 ast_error!(t.base, decorator, format!("Expecting 1 argument for shuffle decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -276,6 +278,7 @@ impl Transform for FunctionDef<'_, '_> {
                         "distribution" => {
                             if args.len() != 1 {
                                 ast_error!(t.base, decorator, format!("Expecting 1 argument for distribution decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -296,6 +299,7 @@ impl Transform for FunctionDef<'_, '_> {
                         "pivotselection" => {
                             if args.len() != 1 {
                                 ast_error!(t.base, decorator, format!("Expecting 1 argument for pivot selection decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -316,6 +320,7 @@ impl Transform for FunctionDef<'_, '_> {
                         "rotation" => {
                             if args.len() == 0 || args.len() > 2 {
                                 ast_error!(t.base, decorator, format!("Expecting 1 or 2 arguments for rotation decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             let mut name = None;
@@ -572,6 +577,10 @@ impl Transform for With<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.items.len() != 1 {
             ast_error!(t.base, self.items.first().unwrap().item.to_ast(t), "Only one with item is supported");
+
+            if self.items.len() == 0 {
+                return make_null();
+            }
         }
 
         let t0 = t.base.tmp_var();
