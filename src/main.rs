@@ -100,6 +100,7 @@ mod gui;
 mod heatmap;
 mod api_layers;
 mod automation;
+mod ffmpeg;
 
 #[cfg(not(feature = "lite"))]
 mod language_layers;
@@ -144,7 +145,8 @@ struct Render {
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
 
-    pub ffmpeg: OnceCell<FFMpeg>
+    pub ffmpeg: OnceCell<FFMpeg>,
+    pub ffmpeg_executable: PathBuf
 }
 
 struct Audio {
@@ -375,7 +377,8 @@ impl Render {
             frame_duration: 0.0,
             speed_cnt: 0,
             speed_cnt_max: 1,
-            ffmpeg: OnceCell::new()
+            ffmpeg: OnceCell::new(),
+            ffmpeg_executable: PathBuf::from("ffmpeg")
         }
     }
 }
@@ -1751,7 +1754,7 @@ impl UniV {
     fn init_ffmpeg(&mut self, frame: &raylib::ffi::Image) -> Result<(), ExecutionInterrupt> {
         self.render.ffmpeg.set(FFMpeg {
             video: {
-                Command::new("ffmpeg")
+                Command::new(&self.render.ffmpeg_executable)
                     .args([
                         "-hwaccel", "auto",
 
@@ -1776,7 +1779,7 @@ impl UniV {
                     .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
             },
             audio: {
-                Command::new("ffmpeg")
+                Command::new(&self.render.ffmpeg_executable)
                     .args([
                         "-hwaccel", "auto",
 
@@ -2569,9 +2572,10 @@ impl UniV {
 
             let thread_running = Arc::new(AtomicBool::new(true));
             let local_running = Arc::clone(&thread_running);
+            let executable = self.render.ffmpeg_executable.clone();
 
             let handle = std::thread::spawn(move || {
-                let res = Command::new("ffmpeg")
+                let res = Command::new(executable)
                     .args([
                         "-i", "tmp.mp4",
                         "-i", "tmp.wav",
@@ -2890,9 +2894,176 @@ impl UniV {
         }
     }
 
+    fn find_or_install_ffmpeg(&mut self) -> Result<bool, ExecutionInterrupt> {
+        for (msg, command) in [
+            ("in program path", program_dir!().join("ffmpeg")), 
+            ("globally", PathBuf::from("ffmpeg"))
+        ] {
+            log!(TraceLogLevel::LOG_INFO, "Attempting to find ffmpeg executable {}", msg);
+
+            match Command::new(&command).arg("-version").output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        log!(TraceLogLevel::LOG_INFO, "Found ffmpeg at {:?}", command);
+                        self.render.ffmpeg_executable = command;
+                        return Ok(true);
+                    }
+
+                    if let Some(code) = output.status.code() {
+                        log!(TraceLogLevel::LOG_WARNING, "ffmpeg command exited with code {}", code);
+                    } else {
+                        log!(TraceLogLevel::LOG_WARNING, "ffmpeg command exited with a non-zero exit code");
+                    }
+                }
+                Err(e) => {
+                    log!(TraceLogLevel::LOG_WARNING, "Failed to execute ffmpeg command: {}", e.to_string());
+                }
+            }
+        }
+
+        if ffmpeg::URL == "" {
+            self.gui.build_fn = Gui::popup;
+            self.gui.popup.set(
+                "Error", 
+                concat!(
+                    "ffmpeg is not installed on your machine and it cannot be downloaded automatically for your platform.\n",
+                    "Please install it manually if you want to use render mode"
+                )
+            ).unwrap();
+            self.run_gui()?;
+            return Ok(false);
+        }
+
+        self.gui.build_fn = Gui::selection;
+        self.gui.selection.set(
+            "Error", 
+            concat!(
+                "You enabled render mode, but it looks like ffmpeg is not present on your machine.\n",
+                "Would you like to download it?"
+            ),
+            [
+                "Yes",
+                "No"
+            ].into_iter().map(|x| Rc::from(x)).collect(), 
+            0
+        ).unwrap();
+        self.run_gui()?;
+
+        if self.gui.selection.index == 1 {
+            return Ok(false);
+        }
+
+        let thread_running = Arc::new(AtomicBool::new(true));
+        let local_running = Arc::clone(&thread_running);
+
+        let handle = std::thread::spawn(move || {
+            let inner = || {
+                let client = reqwest::blocking::ClientBuilder::new()
+                    .timeout(ffmpeg::DOWNLOAD_TIMEOUT)
+                    .build()
+                    .map_err(|e| e.to_string())?;
+
+                let response = client.get(ffmpeg::URL).send()
+                    .map_err(|e| e.to_string())?;
+
+                let status = response.status();
+                if !status.is_success() {
+                    return Err({
+                        if let Some(reason) = status.canonical_reason() {
+                            format!("{}: {}", status.as_str(), reason)
+                        } else {
+                            status.to_string()
+                        }
+                    });
+                }
+
+                let data = response.bytes()
+                    .map_err(|e| e.to_string())?
+                    .to_vec();
+
+                let mut gz = flate2::read::GzDecoder::new(&data[..]);
+                let mut decoded_data = Vec::with_capacity(data.len());
+                gz.read_to_end(&mut decoded_data)
+                    .map_err(|e| e.to_string())?;
+
+                drop(gz);
+                drop(data);
+
+                let output_file = program_dir!().join("ffmpeg");
+                let mut f = File::create(&output_file)
+                    .map_err(|e| e.to_string())?;
+                f.write_all(&decoded_data)
+                    .map_err(|e| e.to_string())?;
+
+                if cfg!(unix) {
+                    use std::os::unix::fs::PermissionsExt;
+                    // make file readable and executable
+                    fs::set_permissions(output_file, fs::Permissions::from_mode(0o555))
+                        .map_err(|e| e.to_string())?;
+                }
+
+                Ok(())
+            };
+
+            let result = inner();
+            thread_running.store(false, atomic::Ordering::Relaxed);
+            result
+        });
+
+        self.gui.build_fn = Gui::loading_panel;
+        self.gui.loading_panel.set_message("Downloading and installing ffmpeg...");
+        self.gui.loading_panel.running = local_running;
+        self.run_gui()?;
+
+        handle.join()
+            .map_err(|_| self.vm.create_exception(UniLValue::String(Rc::from("Error joining ffmpeg download process"))))?
+            .map_err(|e| self.vm.create_exception(UniLValue::String(
+                format!("An error occurred while trying to download ffmpeg:\n{}", e.to_string()
+            ).into())))?;
+
+        log!(TraceLogLevel::LOG_INFO, "Verifying installed ffmpeg");
+
+        let command = program_dir!().join("ffmpeg");
+        let error = {
+            match Command::new(&command).arg("-version").output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        log!(TraceLogLevel::LOG_INFO, "ffmpeg was installed correctly");
+                        self.render.ffmpeg_executable = command;
+                        return Ok(true);
+                    }
+
+                    if let Some(code) = output.status.code() {
+                        log!(TraceLogLevel::LOG_ERROR, "ffmpeg command exited with code {}", code);
+                        format!("exit code: {}", code)
+                    } else {
+                        log!(TraceLogLevel::LOG_ERROR, "ffmpeg command exited with a non-zero exit code");
+                        String::from("non-zero exit code")
+                    }
+                }
+                Err(e) => {
+                    let error = e.to_string();
+                    log!(TraceLogLevel::LOG_ERROR, "Failed to execute ffmpeg command: {}", error);
+                    error
+                }
+            }
+        };
+
+        self.gui.build_fn = Gui::popup;
+        self.gui.popup.set("Error", format!("ffmpeg was not installed correctly.\nError: {}", error).as_str()).unwrap();
+        self.run_gui()?;
+        Ok(false)
+    }
+
     fn main_menu(&mut self) -> Result<(), ExecutionInterrupt> {
         loop {
             if self.settings.render {
+                if !self.render.active && !self.find_or_install_ffmpeg()? {
+                    self.settings.render = false;
+                    self.try_save_settings();
+                    continue;
+                }
+
                 self.enable_render_mode();
             } else {
                 self.enable_realtime_mode();
