@@ -3029,7 +3029,8 @@ impl UniV {
                 format!("An error occurred while trying to download ffmpeg:\n{}", e.to_string()
             ).into())))?;
 
-        log!(TraceLogLevel::LOG_INFO, "Verifying installed ffmpeg");
+        log!(TraceLogLevel::LOG_INFO, "Verifying ffmpeg installation");
+        self.loading_message("Verifying ffmpeg installation...")?;
 
         let command = program_dir!().join("ffmpeg");
         let error = {
