@@ -2,6 +2,9 @@
 #![cfg_attr(feature = "lite", allow(unused))]
 #![cfg_attr(feature = "dev", allow(unused))]
 
+#[cfg(not(any(feature = "full", feature = "lite", feature = "dev")))]
+compile_error!("UniV must be compiled with one of these features: \"full\", \"lite\", \"dev\" (\"full\" is default)");
+
 use std::{cell::{OnceCell, RefCell}, cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, env, fmt::Debug, fs::{self, create_dir, File}, io::{Error, ErrorKind, Read, Write}, panic, path::PathBuf, process::{Child, Command, Stdio}, rc::Rc, sync::{atomic::{self, AtomicBool}, Arc, OnceLock}, thread, time::{Duration, Instant}};
 use algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort};
 use automation::{AutomationFile, AutomationInterpreter, AutomationMode};
@@ -2894,6 +2897,7 @@ impl UniV {
         }
     }
 
+    #[cfg(not(feature = "dev"))]
     fn find_or_install_ffmpeg(&mut self) -> Result<bool, ExecutionInterrupt> {
         for (msg, command) in [
             ("in program path", program_dir!().join("ffmpeg")), 
@@ -3066,6 +3070,7 @@ impl UniV {
 
     fn main_menu(&mut self) -> Result<(), ExecutionInterrupt> {
         loop {
+            #[cfg(not(feature = "dev"))]
             if self.settings.render {
                 if !self.render.active && !self.find_or_install_ffmpeg()? {
                     self.settings.render = false;
