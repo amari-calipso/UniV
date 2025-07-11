@@ -16,7 +16,7 @@ UniV aims to be the most feature-rich, easy to use, and compatible sorting visua
 - UniV loves **open source**. Contributions and forks are more than welcome, and UniV attempts to be as open and accessible as possible for developers.
 
 # Run or build
-Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) installed on your machine.
+Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) installed on your machine. If it's not installed and you enable render mode, UniV will ask you if you want to download it automatically.
 
 Jump to [releases](https://github.com/amari-calipso/UniV/releases) if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
 
