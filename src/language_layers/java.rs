@@ -232,14 +232,7 @@ impl ASTTransformer {
                     .insert(name);
             }
             "method_declaration" => {
-                let header_node = node.child(1).unwrap();
-
-                let mut method_declarator_node = header_node.child(header_node.child_count() - 1).unwrap();
-                if method_declarator_node.kind() == "throws" {
-                    method_declarator_node = header_node.child(header_node.child_count() - 2).unwrap();
-                }
-
-                let name_node = method_declarator_node.child_by_field_name("name").unwrap();
+                let name_node = node.child_by_field_name("name").unwrap();
                 let orig_text = self.text_from_node(&name_node);
                 let name = self.base.get_fn_name(&orig_text);
 
@@ -1313,16 +1306,49 @@ impl ASTTransformer {
                 }
             }
             "constructor_declaration" => {
-                todo!()
+                let body_node = node.child_by_field_name("body").unwrap();
+
+                let body = get_vec_of_expr_from_block(
+                    ctx.run(|ctx| self.transform_one(&body_node, ctx)).await
+                );
+
+                let name_node = node.child_by_field_name("name").unwrap();
+                let mut name = get_token_from_variable(
+                    ctx.run(|ctx| self.transform_one(&name_node, ctx)).await
+                );
+                name.set_lexeme("__Java_constructor");
+
+                let params = self.get_parameters(
+                    &node.child_by_field_name("parameters").unwrap()
+                );
+
+                Expression::Function { 
+                    name, params, body, 
+                    return_type: Box::new(Expression::Variable { 
+                        name: self.tok_from_node_with_lexeme(node, "any") 
+                    })
+                }
             }
             "constructor_body" => {
                 self.ignore_super = self.in_sort_decl;
+
+                let mut expressions = Vec::new();
                 
-                todo!();
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if matches!(self.text_from_node(&child).as_ref(), "{" | "}") || child.kind() == "explicit_constructor_invocation" {
+                        continue;
+                    }
+                    
+                    expressions.push(ctx.run(|ctx| self.transform_one(&child, ctx)).await);
+                }
 
                 self.ignore_super = false;
 
-                todo!()
+                Expression::Block { 
+                    opening_brace: node_token, 
+                    expressions 
+                }
             }
             "switch_expression" => {
                 todo!()
