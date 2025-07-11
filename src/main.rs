@@ -2989,7 +2989,14 @@ impl UniV {
                 drop(gz);
                 drop(data);
 
-                let output_file = program_dir!().join("ffmpeg");
+                let output_file = program_dir!().join({
+                    if cfg!(windows) {
+                        "ffmpeg.exe"
+                    } else {
+                        "ffmpeg"
+                    }
+                });
+
                 let mut f = File::create(&output_file)
                     .map_err(|e| e.to_string())?;
                 f.write_all(&decoded_data)
