@@ -458,8 +458,8 @@ UniL also provides access to functions to interact with the visualizer
 - `UniV_getRotation(String) Object`: gets a shared rotation algorithm given its name. Throws an exception if the algorithm doesn't exist;
 
 #### User input
-- `UniV_getUserPivotSelection(String) Callable`: like `UniV_getPivotSelection`, but it asks the user to select a pivot selection algorithm. The parameter is a message to display to the user;
-- `UniV_getUserRotation(String) Object`: like `UniV_getRotation`, but it asks the user to select a rotation algorithm. The parameter is a message to display to the user;
+- `UniV_getUserPivotSelection(String, String | Null) Callable`: like `UniV_getPivotSelection`, but it asks the user to select a pivot selection algorithm. The first arameter is a message to display to the user, the second one is the default pivot selection (if any);
+- `UniV_getUserRotation(String, String | Null) Object`: like `UniV_getRotation`, but it asks the user to select a rotation algorithm. The first parameter is a message to display to the user, the second one is the default rotation (if any);
 - `UniV_getUserSelection(List, String) Int`: asks the user to select between a list of items. Returns the selection index. The string parameter is a message to display to the user;
 - `UniV_getUserInput(message: String, default: String, convert: Callable) any`: asks the user to insert some text. The text is then passed to the `convert` callable, to convert it to the desired type. If `convert` fails, the user will be prompted to retry. Returns the converted output. If no conversion is needed, you can pass `asAny`, while if you need to get an Int, use `parseInt`;
 - `UniV_popup(String) Null`: shows a popup with a given message to the user; 

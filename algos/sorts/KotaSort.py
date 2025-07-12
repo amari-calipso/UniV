@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
 @Sort("Block Merge Sorts", "Kota Sort", "Kota Sort")
 def kotaSortRun(array):
-    rotate = UniV_getUserRotation("Select rotation algorithm (default: Cycle Reverse)").indexed
+    rotate = UniV_getUserRotation("Select rotation algorithm", "Cycle Reverse").indexed
     oldRotate = kotaSort.rotate
     kotaSort.rotate = rotate
     kotaSort.sort(array, 0, len(array))

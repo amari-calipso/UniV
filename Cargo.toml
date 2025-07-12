@@ -1,6 +1,6 @@
 [package]
 name = "univ"
-version = "2025.7.10"
+version = "2025.7.12"
 edition = "2024"
 
 [profile.dev]

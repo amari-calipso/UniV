@@ -301,8 +301,9 @@ api_layer_fn! {
         Ok(UniLValue::Object(Rc::new(RefCell::new(univ.get_pivot_selection(&name)?.clone().into()))))
     }
 
-    UniV_getUserPivotSelection(args, [UniLType::String], univ, _task) {
+    UniV_getUserPivotSelection(args, [UniLType::String, UniLType::Group(HashSet::from([UniLType::String, UniLType::Null]))], univ, _task) {
         let msg = expect_string(&args[0], "first argument of 'UniV_getUserPivotSelection'", univ)?;
+        let default = expect_optional_string(&args[1], "second argument of 'UniV_getUserPivotSelection'", univ)?;
 
         let popped = univ.pop_autovalue();
         match popped {
@@ -320,9 +321,27 @@ api_layer_fn! {
             }
         }
 
+        let pivot_selections = univ.gui.pivot_selections.clone();
+        let mut default_idx = 0;
+        let mut full_msg = String::from(msg.as_ref());
+        
+        if let Some(default) = default {
+            full_msg.push_str(" (default: ");
+            full_msg.push_str(&default);
+            full_msg.push(')');
+
+            if let Ok(index) = pivot_selections.binary_search(&default) {
+                default_idx = index;
+            } else {
+                return Err(univ.vm.create_exception(UniLValue::String(format!(
+                    "Unknown default pivot selection \"{}\"", default
+                ).into())));
+            }
+        }
+
         univ.save_background();
         univ.gui.build_fn = Gui::selection;
-        univ.gui.selection.set(&univ.currently_running, &msg, univ.gui.pivot_selections.clone(), 0)
+        univ.gui.selection.set(&univ.currently_running, &full_msg, pivot_selections, default_idx)
             .map_err(|e| univ.vm.create_exception(UniLValue::String(e)))?;
         univ.run_gui()?;
 
@@ -341,8 +360,9 @@ api_layer_fn! {
         Ok(UniLValue::Object(Rc::new(RefCell::new(univ.get_rotation(&name)?.to_object().into()))))
     }
 
-    UniV_getUserRotation(args, [UniLType::String], univ, _task) {
+    UniV_getUserRotation(args, [UniLType::String, UniLType::Group(HashSet::from([UniLType::String, UniLType::Null]))], univ, _task) {
         let msg = expect_string(&args[0], "first argument of 'UniV_getUserRotation'", univ)?;
+        let default = expect_optional_string(&args[1], "second argument of 'UniV_getUserRotation'", univ)?;
 
         let popped = univ.pop_autovalue();
         match popped {
@@ -360,9 +380,27 @@ api_layer_fn! {
             }
         }
 
+        let rotations = univ.gui.rotations.clone();
+        let mut default_idx = 0;
+        let mut full_msg = String::from(msg.as_ref());
+        
+        if let Some(default) = default {
+            full_msg.push_str(" (default: ");
+            full_msg.push_str(&default);
+            full_msg.push(')');
+
+            if let Ok(index) = rotations.binary_search(&default) {
+                default_idx = index;
+            } else {
+                return Err(univ.vm.create_exception(UniLValue::String(format!(
+                    "Unknown default rotation \"{}\"", default
+                ).into())));
+            }
+        }
+
         univ.save_background();
         univ.gui.build_fn = Gui::selection;
-        univ.gui.selection.set(&univ.currently_running, &msg, univ.gui.rotations.clone(), 0)
+        univ.gui.selection.set(&univ.currently_running, &full_msg, rotations, default_idx)
             .map_err(|e| univ.vm.create_exception(UniLValue::String(e)))?;
         univ.run_gui()?;
 

@@ -3,7 +3,7 @@ class BufMerge2:
 
     def __init__(this, rot):
         if rot is None:
-            this.rotate = UniV_getUserRotation("Select rotation algorithm (default: Helium)").indexed
+            this.rotate = UniV_getUserRotation("Select rotation algorithm", "Helium").indexed
         else:
             this.rotate = sortingVisualizer.getRotationByName(rot).indexed
 

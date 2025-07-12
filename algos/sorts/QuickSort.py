@@ -1,7 +1,7 @@
 class QuickSort:
     def __init__(this, pSel):
         if pSel is None:
-            this.pSel = UniV_getUserPivotSelection("Select pivot selection")
+            this.pSel = UniV_getUserPivotSelection("Select pivot selection", None)
         else:
             this.pSel = sortingVisualizer.getPivotSelectionByName(pSel)
 

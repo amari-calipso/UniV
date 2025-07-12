@@ -1,7 +1,7 @@
 class InPlaceStableCycleSort:
     def __init__(this, rot):
         if rot is None:
-            this.rotate = UniV_getUserRotation("Select rotation algorithm (default: Cycle Reverse)").indexed
+            this.rotate = UniV_getUserRotation("Select rotation algorithm", "Cycle Reverse").indexed
         else:
             this.rotate = sortingVisualizer.getRotationByName(rot).indexed
 
