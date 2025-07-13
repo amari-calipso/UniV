@@ -1940,6 +1940,30 @@ impl Transform for Call<'_, '_> {
                 }
             }
 
+            match name.lexeme.as_ref() {
+                "append" => {
+                    if self.args.len() == 1 {
+                        return Expression::Call { 
+                            callee: Box::new(Expression::Variable { name: t.tok_with_lexeme(self.lpar_tok, "List_push") }), 
+                            paren: t.tok(self.lpar_tok), 
+                            args: vec![*object.clone(), self.args.first().unwrap().to_ast(t)]
+                        };
+                    }
+                }
+                "pop" | "clear" => {
+                    if self.args.len() == 0 {
+                        return Expression::Call { 
+                            callee: Box::new(Expression::Variable { 
+                                name: t.tok_with_lexeme(self.lpar_tok, format!("List_{}", name.lexeme).as_str()) 
+                            }), 
+                            paren: t.tok(self.lpar_tok), 
+                            args: vec![*object.clone()]
+                        };
+                    }
+                }
+                _ => ()
+            }
+
             if matches!(&**object, Expression::Variable { .. }) {
                 return Expression::Call {
                     callee: Box::new(Expression::Get {

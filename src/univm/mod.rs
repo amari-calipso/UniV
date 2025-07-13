@@ -317,7 +317,26 @@ impl Task {
                     return self.stack.push(UniLValue::String(x.repeat(*times as usize).into()));
                 }
             }
-            UniLValue::Null | UniLValue::Object(_) => ()
+            UniLValue::Object(obj) => {
+                if let AnyObject::List(list) = &*obj.borrow() {
+                    if let UniLValue::Int(times) = right {
+                        if *times < 0 {
+                            self.exception = Some(UniLValue::String(Rc::from("Cannot repeat list a negative amount of times")));
+                            return;
+                        }
+
+                        let mut output = Vec::new();
+                        for _ in 0 .. *times {
+                            for item in &list.items {
+                                output.push(item.clone());
+                            }
+                        }
+
+                        return self.stack.push(UniLValue::Object(Rc::new(RefCell::new(List::from(output).into()))));
+                    }
+                }
+            }
+            UniLValue::Null => ()
         }
 
         self.exception = Some(UniLValue::String(format!(

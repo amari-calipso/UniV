@@ -16,7 +16,7 @@ class FeatureSort:
         i = a
         while i < b:
             idx = int((array[i].readInt()-min_)*CONST)
-            List_push(aux[idx], array[i])
+            aux[idx].append(array[i])
             i += 1
         for i in range(b-a):
             this.sortSubarray(aux[i], array)
