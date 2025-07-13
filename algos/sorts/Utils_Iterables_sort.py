@@ -124,7 +124,7 @@ class UtilsIterablesSortMerge:
             this.merge(array, m3, m2, b, False)
 
     def merge(this, array, a, m, b, check):
-        if checkMergeBounds(array, a, m, b, this.rotate):
+        if this.checkMergeBounds(array, a, m, b):
             return
         if check:
             b = lrBinarySearch(array, m, b, array[m-1].read(), True)
