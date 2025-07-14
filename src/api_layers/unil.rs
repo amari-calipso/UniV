@@ -370,7 +370,7 @@ api_layer_fn! {
             let value = with_timer!(univ, list.items.pop());
             univ.writes += 1;
 
-            let idx = list.items.len();
+            let idx = list.items.len() - 1;
 
             let aux = univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(idx, aux));

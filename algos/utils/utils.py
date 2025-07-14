@@ -110,17 +110,6 @@ def insertToLeft(array, _from, to):
     array[to].writeRestoreIdx(temp, idx)
 
 
-def insertToRight(array, _from, to):
-    temp: Value
-    idx: int
-    temp, idx = array[_from].readNoMark()
-    i = _from
-    while i < to:
-        array[i].write(array[i+1].noMark())
-        i += 1
-    array[to].writeRestoreIdx(temp, idx)
-
-
 def checkMergeBounds(array, a, m, b, rotate):
     if rotate is None:
         rotate = sortingVisualizer.getRotationByName("Helium").indexed

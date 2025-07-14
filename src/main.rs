@@ -950,6 +950,11 @@ impl UniV {
         self.set_hl_buf.insert(HighlightInfo::new(0, None, None, true, false));
 
         let mut color = SORTED_COLOR;
+        
+        if self.shared.array.len() != self.shared.verify_array.len() {
+            color = UNSORTED_COLOR;
+        }
+
         for i in 0 .. self.shared.array.len() {
             if self.shared.array[i].value != self.shared.verify_array[i].value {
                 color = UNSORTED_COLOR;

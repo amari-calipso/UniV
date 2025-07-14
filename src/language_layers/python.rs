@@ -1950,11 +1950,34 @@ impl Transform for Call<'_, '_> {
                         };
                     }
                 }
-                "pop" | "clear" => {
+                "pop" => {
+                    match self.args.len() {
+                        0 => {
+                            return Expression::Call { 
+                                callee: Box::new(Expression::Variable { 
+                                    name: t.tok_with_lexeme(self.lpar_tok, "List_pop") 
+                                }), 
+                                paren: t.tok(self.lpar_tok), 
+                                args: vec![*object.clone()]
+                            };
+                        }
+                        1 => {
+                            return Expression::Call { 
+                                callee: Box::new(Expression::Variable { 
+                                    name: t.tok_with_lexeme(self.lpar_tok, "List_removeIdx") 
+                                }), 
+                                paren: t.tok(self.lpar_tok), 
+                                args: vec![*object.clone(), self.args.first().unwrap().to_ast(t)]
+                            };
+                        }
+                        _ => ()
+                    }
+                }
+                "clear" => {
                     if self.args.len() == 0 {
                         return Expression::Call { 
                             callee: Box::new(Expression::Variable { 
-                                name: t.tok_with_lexeme(self.lpar_tok, format!("List_{}", name.lexeme).as_str()) 
+                                name: t.tok_with_lexeme(self.lpar_tok, "List_clear") 
                             }), 
                             paren: t.tok(self.lpar_tok), 
                             args: vec![*object.clone()]

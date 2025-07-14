@@ -395,7 +395,8 @@ log(c); // Undefined variable
 The most important functions in the standard library are:
 - `swap(List, Int, Int) Null`: swaps two indices in an array;
 - `List_push(List, any) Null`: pushes a value to the end of a List;
-- `List_pop(List) any`: Pops the last value from a list. Returns null if the list is empty;
+- `List_pop(List) any`: Pops the last value from a list. Returns null if the list is empty, otherwise it returns the value that was removed;
+- `List_removeIdx(List) any`: Removes a value at a given index from a list. Returns null if the list is empty, otherwise it returns the value that was removed;
 - `List_clear(List) Null`: removes all elements in a List;
 - `List_min(List) any`: returns the minimum item in a List;
 - `List_max(List) any`: returns the maximum item in a List;
