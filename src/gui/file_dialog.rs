@@ -3,7 +3,7 @@
 
 use std::{cmp::Ordering, fs, path::PathBuf, rc::Rc};
 
-use crate::program_dir;
+use crate::{get_expect_mut, program_dir};
 
 use super::{FileOption, Gui};
 
@@ -56,7 +56,7 @@ impl FileDialog {
 
 impl Gui {
     pub fn file_dialog(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

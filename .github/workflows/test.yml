@@ -1,0 +1,23 @@
+name: Run Tests
+
+on: [push]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rust_toolchain: stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup toolchain
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+
+      - name: Run tests
+        run: RUST_BACKTRACE=full cargo test --features dev -- --color always --nocapture

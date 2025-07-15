@@ -1,5 +1,7 @@
 use std::sync::{atomic::{self, AtomicBool}, Arc};
 
+use crate::get_expect_mut;
+
 use super::Gui;
 
 pub struct LoadingPanel {
@@ -23,7 +25,7 @@ impl LoadingPanel {
 
 impl Gui {
     pub fn loading_panel(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

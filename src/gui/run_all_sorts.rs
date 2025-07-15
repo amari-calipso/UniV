@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{imgui_centered_text, imgui_items_to_end, imgui_spaced_separator};
+use crate::{get_expect_mut, imgui_centered_text, imgui_items_to_end, imgui_spaced_separator};
 
 use super::Gui;
 
@@ -32,7 +32,7 @@ impl RunAllSorts {
 
 impl Gui {
     pub fn run_all_sorts(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut run = false;
         self.run_all_sorts.back = false;

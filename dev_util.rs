@@ -1,7 +1,35 @@
-use std::{collections::HashMap, env, fs, io::{Error, ErrorKind}, path::{Path, PathBuf}, process::Command};
+use std::{cmp::min, collections::HashMap, env, fs::{self, File}, io::{Error, ErrorKind, Write}, path::{Path, PathBuf}, process::Command, str};
 
 // UNIX-like: rustc dev_util.rs -o dev_util && ./dev_util <command>
 // Windows: rustc dev_util.rs -o dev_util.exe && dev_util <command>
+
+const ALGO_TEST_HEADER: &str = r#"
+use std::{path::PathBuf, rc::Rc};
+use crate::{automation::AutomationMode, get_expect, UniV, PROGRAM_DIR};
+"#;
+
+const ALGO_TEST_TEMPLATE: &str = r#"
+#[test]
+fn run_all_sorts_$d$_$s$() {
+    let _ = PROGRAM_DIR.set(PathBuf::new()); // if it's already set, ignore
+    
+    let mut univ = UniV::new();
+    univ.load_algos().expect("Failed to load algorithms");
+    univ.shuffles.remove("Run automation"); // we don't care about this for tests
+    univ.init_gui_algos(); // sync removal with gui
+
+    univ.gui.run_all_sorts.speed = f64::INFINITY; // skip all render calls     
+    univ.automation_interpreter.mode = AutomationMode::RunSorts;
+
+    univ.gui.run_all_sorts.distribution = $d$;
+    univ.gui.run_all_sorts.shuffle = $s$;
+
+    univ.execute_automation(
+        Rc::clone(&get_expect!(univ.run_all_sorts).source),
+        Rc::clone(&get_expect!(univ.run_all_sorts).filename)
+    ).expect("Failed to run automation");
+}
+"#;
 
 fn copy_dir_recursive(src: &PathBuf, dst: &Path) -> Result<(), Error> {
     for entry in fs::read_dir(src)? {
@@ -56,14 +84,14 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     };
 
     let mut command = Command::new("cargo");
-    command.arg("build").arg("--release");
+    command.args(["build", "--release"]);
 
     if lite {
-        command.arg("--features").arg("lite");
+        command.args(["--features", "lite"]);
     }
 
     if let Some(target) = &target {
-        command.arg("--target").arg(target);
+        command.args(["--target", target]);
     }
 
     println!("Calling cargo");
@@ -113,8 +141,11 @@ fn compile_algos() -> Result<(), Error> {
     println!("Compiling algorithms into bytecode");
 
     let mut command = Command::new("cargo");
-    command.arg("run").arg("--features").arg("dev")
-        .arg("--").arg("--compile-algos");
+    command.args([
+        "run", 
+        "--features", "dev",
+        "--", "--compile-algos"
+    ]);
 
     if !command.status()?.success() {
         return Err(Error::other("Compilation failed"));
@@ -132,9 +163,10 @@ fn run_lite() -> Result<(), Error> {
     compile_algos()?;
 
     if Command::new("cargo")
-        .arg("run")
-        .arg("--features")
-        .arg("lite")
+        .args([
+            "run",
+            "--features", "lite"
+        ])
         .status()?
         .success() 
     {
@@ -161,6 +193,94 @@ fn clean() -> Result<(), Error> {
 
     ok_if_notfound!(fs::remove_file(PathBuf::from("./algos.unib")));
     ok_if_notfound!(fs::remove_dir_all(PathBuf::from("./resources/gen")));
+    Ok(())
+}
+
+fn test_algos() -> Result<(), Error> {
+    println!("Counting algorithms");
+
+    let mut command = Command::new("cargo");
+    command.args([
+        "run", 
+        "--features", "dev",
+        "--", "--load-algos"
+    ]);
+
+    let output = command.output()?;
+
+    let stdout_output = str::from_utf8(&output.stdout)
+        .expect("stdout contained invalid UTF-8");
+
+    let stderr_output = str::from_utf8(&output.stderr)
+        .expect("stderr contained invalid UTF-8");
+
+    if !output.status.success() {
+        println!("{}{}", stdout_output, stderr_output);
+        return Err(Error::other("Compilation failed"));
+    }
+    
+    let mut n_distributions = 0;
+    let mut n_shuffles = 0;
+
+    for line in stdout_output.split('\n') {
+        if let Some(remaining) = line.strip_prefix("INFO: UniV: Loaded ") {
+            let (n, type_) = remaining.split_once(' ')
+                .expect("Unexpected output");
+
+            match type_ {
+                "distributions" => n_distributions = n.parse().expect("Unexpected output"),
+                "shuffles" => n_shuffles = n.parse().expect("Unexpected output"),
+                _ => continue
+            }
+        }
+    }
+
+    println!("Found {} distributions", n_distributions);
+    println!("Found {} shuffles", n_shuffles);
+    
+    if n_distributions == 0 || n_shuffles == 0 {
+        println!("No tests to run");
+        return Err(Error::other("No tests to run"));
+    }
+
+    println!("Generating tests");
+
+    {
+        let mut test_file = File::create("./src/dev/tests/generated.rs")?;
+        test_file.write_all(ALGO_TEST_HEADER.as_bytes())?;
+
+        for distribution in 0 .. n_distributions {
+            for shuffle in 0 .. n_shuffles {
+                let code = ALGO_TEST_TEMPLATE
+                    .replace("$d$", &distribution.to_string())
+                    .replace("$s$", &shuffle.to_string());
+
+                test_file.write_all(code.as_bytes())?;
+            }
+        }
+    }
+
+    let n_threads = min(n_distributions * n_shuffles, std::thread::available_parallelism()?.into());
+
+    println!("Running tests with {} threads", n_threads);
+
+    unsafe {
+        env::set_var("RUST_BACKTRACE", "full");
+    }
+
+    command = Command::new("cargo");
+    command.args([
+        "test",
+        "--features", "dev",
+        "--release",
+        "--", 
+        "--test-threads", &n_threads.to_string()
+    ]);
+    
+    if !command.status()?.success() {
+        return Err(Error::other("Non-zero return code"));
+    }
+
     Ok(())
 }
 
@@ -197,6 +317,7 @@ fn main() -> Result<(), Error> {
         "--release-lite" -> release_lite(&mut args, &mut args_map)?
         "--run-lite"     -> run_lite()?
         "--clean"        -> clean()?
+        "--test-algos"   -> test_algos()?
     };
 
     println!("Done!");

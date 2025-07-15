@@ -10,6 +10,9 @@
 /src/api_layers/mod.rs
 /src/language_layers/mod.rs
 
+# generated tests
+/src/dev/tests/
+
 # algorithms bytecode
 algos.unib
 

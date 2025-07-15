@@ -46,7 +46,7 @@ impl AutomationFileInfo {
 }
 
 pub struct Gui {
-    imgui: imgui::Context,
+    imgui: OnceCell<imgui::Context>,
     renderer: OnceCell<raylib_imgui_rs::Renderer>,
     pub build_fn: fn(&mut Self) -> bool,
 
@@ -115,11 +115,8 @@ impl Gui {
     const BACK_BUTTON_Y_SIZE: f32 = 20.0;
 
     pub fn new() -> Self {
-        let mut imgui = imgui::Context::create();
-        imgui.set_ini_filename(None);
-
         Gui {
-            imgui,
+            imgui: OnceCell::new(),
             renderer: OnceCell::new(),
             build_fn: Self::placeholder_fn,
 
@@ -162,15 +159,21 @@ impl Gui {
     }
 
     pub fn init(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) {
-        self.imgui.fonts().clear();
-        self.imgui.fonts()
+        let mut imgui = imgui::Context::create();
+        imgui.set_ini_filename(None);
+
+        self.imgui.take();
+        self.imgui.set(imgui).unwrap();
+        
+        get_expect_mut!(self.imgui).fonts().clear();
+        get_expect_mut!(self.imgui).fonts()
             .add_font(&[
                 FontSource::DefaultFontData { config: None }
             ]);
 
         self.renderer.take();
         let _ = self.renderer.set(
-            raylib_imgui_rs::Renderer::create(&mut self.imgui, rl, thread)
+            raylib_imgui_rs::Renderer::create(get_expect_mut!(self.imgui), rl, thread)
         );
 
         let width = rl.get_screen_width() as u32;
@@ -209,13 +212,13 @@ impl Gui {
         let mut quit = true;
 
         while !rl.window_should_close() {
-            get_expect_mut!(self.renderer).update(&mut self.imgui, rl);
+            get_expect_mut!(self.renderer).update(get_expect_mut!(self.imgui), rl);
 
             let done = (self.build_fn)(self);
 
             let mut draw = rl.begin_drawing(thread);
             draw.draw_texture(get_expect!(self.background), 0, 0, Color::WHITE);
-            get_expect!(self.renderer).render(&mut self.imgui, &mut draw);
+            get_expect!(self.renderer).render(get_expect_mut!(self.imgui), &mut draw);
 
             if done {
                 quit = false;
@@ -245,11 +248,11 @@ impl Gui {
             return Err(ExecutionInterrupt::Quit);
         }
 
-        get_expect_mut!(self.renderer).update(&mut self.imgui, rl);
+        get_expect_mut!(self.renderer).update(get_expect_mut!(self.imgui), rl);
         (self.build_fn)(self);
         let mut draw = rl.begin_drawing(thread);
         draw.draw_texture(get_expect!(self.background), 0, 0, Color::WHITE);
-        get_expect!(self.renderer).render(&mut self.imgui, &mut draw);
+        get_expect!(self.renderer).render(get_expect_mut!(self.imgui), &mut draw);
         Ok(())
     }
 }

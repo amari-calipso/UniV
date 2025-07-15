@@ -33,8 +33,16 @@ impl UniLValue {
     pub fn is_truthy(&self) -> bool {
         match self {
             UniLValue::Null => false,
-            UniLValue::String(_) | UniLValue::Object(_) | UniLValue::Float(_) => true,
             UniLValue::Int(x) | UniLValue::Value { value: x, .. } => *x != 0,
+            UniLValue::Float(x) => *x != 0.0, 
+            UniLValue::String(x) => x.len() != 0,
+            UniLValue::Object(obj) => {
+                if let AnyObject::List(list) = &*obj.borrow() {
+                    list.items.len() != 0
+                } else {
+                    true
+                }
+            }
         }
     }
 

@@ -2,7 +2,7 @@ use std::{fs, rc::Rc};
 
 use raylib::ffi::TraceLogLevel;
 
-use crate::{config_dir, imgui_centered_text, imgui_spaced_separator, log, profiles_dir, settings::UniVSettings};
+use crate::{config_dir, get_expect_mut, imgui_centered_text, imgui_spaced_separator, log, profiles_dir, settings::UniVSettings};
 
 use super::Gui;
 
@@ -147,7 +147,7 @@ impl Settings {
 
 impl Gui {
     pub fn settings(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

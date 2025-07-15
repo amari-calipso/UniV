@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{imgui_centered_text, imgui_spaced_separator};
+use crate::{get_expect_mut, imgui_centered_text, imgui_spaced_separator};
 
 use super::{AutomationFileInfo, Gui};
 
@@ -56,7 +56,7 @@ impl AutomationSelection {
 
 impl Gui {
     pub fn automation_selection(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

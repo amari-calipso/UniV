@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use ordered_float::OrderedFloat;
 
+use crate::get_expect_mut;
+
 use super::Gui;
 
 pub struct Popup {
@@ -34,7 +36,7 @@ impl Popup {
 
 impl Gui {
     pub fn popup(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

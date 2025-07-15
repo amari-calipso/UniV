@@ -189,6 +189,25 @@ fn generate_api_layers_module(folder: &str, src: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+fn generate_dev_tests(src: &Path) -> Result<(), Error> {
+    let dev_tests = src.join("dev").join("tests");
+    if !dev_tests.exists() {
+        info!("\"dev/tests\" folder does not exist. Creating it");
+        create_dir(&dev_tests)?;
+    }
+
+    let test_mod = dev_tests.join("mod.rs");
+    info!("Generating dev tests module");
+    let mut test_mod_file = File::create(test_mod)?;
+    
+    if dev_tests.join("generated.rs").exists() {
+        info!("Found generated tests");
+        test_mod_file.write_all("mod generated;\n".as_bytes())?;
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Error> {
     println!("cargo::rerun-if-changed=src/");
     println!("cargo::rerun-if-changed=resources/");
@@ -218,6 +237,10 @@ fn main() -> Result<(), Error> {
         "layers", 
         "std::collections::HashMap<std::rc::Rc<str>, crate::LanguageLayerFn>"
     )?;
+
+    if cfg!(feature = "dev") {
+        generate_dev_tests(&src)?;
+    }
 
     info!("Generating embeddable resized logo");
     let logo = ImageReader::open(resources.join("logo.png"))?.decode()

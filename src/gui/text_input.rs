@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::get_expect_mut;
+
 use super::Gui;
 
 pub struct TextInput {
@@ -41,7 +43,7 @@ impl TextInput {
 
 impl Gui {
     pub fn text_input(&mut self) -> bool {
-        let ui = self.imgui.new_frame();
+        let ui = get_expect_mut!(self.imgui).new_frame();
 
         let mut quit = false;
 

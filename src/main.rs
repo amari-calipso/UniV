@@ -28,9 +28,6 @@ use value::{Value, VerifyValue};
 use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
 
-#[cfg(feature = "dev")]
-use bincode::encode_into_std_write;
-
 #[cfg(feature = "lite")]
 use bincode::decode_from_slice;
 
@@ -107,6 +104,9 @@ mod ffmpeg;
 
 #[cfg(not(feature = "lite"))]
 mod language_layers;
+
+#[cfg(feature = "dev")]
+mod dev;
 
 enum ArrayState {
     Unsorted,
@@ -333,7 +333,7 @@ impl UniV {
             audio_output_buf: Vec::new(),
 
             render_fn: Self::render_placeholder,
-            sweep_frame_fn: Self::sweep_realtime_frame,
+            sweep_frame_fn: Self::sweep_placeholder_frame,
 
             set_hl_buf: HashSet::new(),
             adapt_hl_buf: Vec::new(),
@@ -650,7 +650,10 @@ impl UniV {
 
     fn get_max_and_prepare(&mut self) {
         self.shared.array_max = max(1, self.shared.verify_array.last().unwrap().value);
+
+        #[cfg(not(feature = "dev"))]
         get_visual!(self).prepare(&mut self.shared, get_expect_mut!(self.rl_handle), get_expect!(self.rl_thread));
+
         self.prepared = true;
     }
 
@@ -660,6 +663,10 @@ impl UniV {
     }
 
     fn draw_array_and_stats(&mut self) {
+        if cfg!(feature = "dev") {
+            return;
+        }
+
         let rl = get_expect_mut!(self.rl_handle);
         let fps = rl.get_fps();
         let mut draw = rl.begin_drawing(get_expect!(self.rl_thread));
@@ -770,6 +777,8 @@ impl UniV {
         }
 
         self.get_verify_array().unwrap(); // upper check makes this never fail
+
+        #[cfg(not(feature = "dev"))]
         get_visual!(self).prepare(&mut self.shared, get_expect_mut!(self.rl_handle), get_expect!(self.rl_thread));
 
         self.marks.clear();
@@ -783,6 +792,10 @@ impl UniV {
     fn reset_heatmaps(&mut self) {
         self.shared.heatmap.map.clear();
         self.shared.aux_heatmap.map.clear();
+    }
+
+    fn sweep_placeholder_frame(&mut self, _index: usize, _color: Color) -> Result<(), ExecutionInterrupt> {
+        Ok(())
     }
 
     // sweeps could very well be implemented without all this extra code, however, since sweeps are such a specific case,
@@ -1070,11 +1083,12 @@ impl UniV {
         Ok(())
     }
 
-    fn report_array_state(&mut self) -> Result<(), ExecutionInterrupt> {
+    fn report_array_state(&mut self) -> Result<bool, ExecutionInterrupt> {
         let sort_name = self.currently_running.clone();
 
         self.set_currently_running("", "Checking...");
 
+        let mut sorted = false;
         match self.sweep()? {
             ArrayState::Unsorted => {
                 self.set_current_name("The list was not sorted");
@@ -1087,10 +1101,12 @@ impl UniV {
             ArrayState::Sorted => {
                 self.set_current_name("The list was sorted");
                 log!(TraceLogLevel::LOG_INFO, "{sort_name} sorted the list unstably");
+                sorted = true;
             }
             ArrayState::StablySorted => {
                 self.set_current_name("The list was sorted stably");
                 log!(TraceLogLevel::LOG_INFO, "{sort_name} sorted the list stably");
+                sorted = true;
             }
         }
 
@@ -1098,10 +1114,10 @@ impl UniV {
         self.wait(1.25)?;
         self.mixer.reset();
 
-        Ok(())
+        Ok(sorted)
     }
 
-    pub fn run_sort(&mut self, category: &str, sort: &str) -> Result<(), ExecutionInterrupt> {
+    pub fn run_sort(&mut self, category: &str, sort: &str) -> Result<bool, ExecutionInterrupt> {
         if !self.sorts.contains_key(category) {
             return Err(self.vm.create_exception(UniLValue::String(format!(
                 "Unknown sort category \"{}\"", category
@@ -1124,11 +1140,11 @@ impl UniV {
 
         self.marks.clear();
         self.reset_aux();
-        self.report_array_state()?;
+        let sorted = self.report_array_state()?;
         self.reset_heatmaps();
         self.save_background();
 
-        Ok(())
+        Ok(sorted)
     }
 
     fn get_verify_array(&mut self) -> Result<(), ExecutionInterrupt> {
@@ -1420,6 +1436,10 @@ impl UniV {
 
     // disables annoying timer log
     fn set_target_fps(&mut self, fps: u32) {
+        if cfg!(feature = "dev") {
+            return;
+        }
+
         self.gui.target_fps = fps;
         let rl = get_expect_mut!(self.rl_handle);
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
@@ -1490,6 +1510,8 @@ impl UniV {
     #[inline]
     fn on_aux_off(&mut self) {
         self.shared.aux.clear();
+
+        #[cfg(not(feature = "dev"))]
         get_visual!(self).on_aux_off(&mut self.shared, get_expect_mut!(self.rl_handle), get_expect!(self.rl_thread));
     }
 
@@ -2542,7 +2564,11 @@ impl UniV {
 
     #[inline]
     pub fn should_close(&self) -> bool {
-        get_expect!(self.rl_handle).window_should_close()
+        if cfg!(feature = "dev") {
+            false
+        } else {
+            get_expect!(self.rl_handle).window_should_close()
+        }
     }
 
     fn enable_render_mode(&mut self) {
@@ -2620,6 +2646,10 @@ impl UniV {
     }
 
     fn save_background(&mut self) {
+        if cfg!(feature = "dev") {
+            return;
+        }
+
         let rl = get_expect_mut!(self.rl_handle);
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
 
@@ -2655,7 +2685,7 @@ impl UniV {
     fn run_sorting_sequence(
         &mut self, distribution_id: i32, shuffle_id: i32, category_id: i32, sort_id: i32,
         length: usize, unique: usize, speed: f64
-    ) -> Result<(), ExecutionInterrupt> {
+    ) -> Result<bool, ExecutionInterrupt> {
         self.run_distribution(
             &Rc::clone(&self.gui.distributions[distribution_id as usize]),
             length,
@@ -2756,13 +2786,20 @@ impl UniV {
             }
         }
 
-        if let Err(e) = self.run_sort(&category, &sort) {
-            if !all_sorts {
-                self.user_values.clear();
-                self.store_user_values = false;
+        match self.run_sort(&category, &sort) {
+            Ok(sorted) => {
+                if cfg!(feature = "dev") && !sorted {
+                    return Err(self.vm.create_exception(UniLValue::String(Rc::from("Sort failed"))));
+                }
             }
+            Err(e) => {
+                if !all_sorts {
+                    self.user_values.clear();
+                    self.store_user_values = false;
+                }
 
-            return Err(e);
+                return Err(e);
+            }
         }
 
         if !all_sorts {
@@ -2781,6 +2818,10 @@ impl UniV {
             length, unique, speed, all_sorts
         ) {
             self.reset_autovalues();
+
+            if cfg!(feature = "dev") {
+                return Err(e);
+            }
 
             if let ExecutionInterrupt::Exception { value, traceback, thread } = e {
                 let formatted = format_traceback!(traceback, value, thread);
@@ -3505,33 +3546,6 @@ impl Drop for UniV {
     }
 }
 
-#[cfg(feature = "dev")]
-fn compile_algos() -> Result<(), Error> {
-    let mut errors = Vec::new();
-    let bytecode = UniV::new().compile_algos(&mut errors);
-
-    if errors.is_empty() {
-        log!(TraceLogLevel::LOG_INFO, "Serializing bytecode");
-
-        let mut f = File::create("algos.unib")?;
-        encode_into_std_write(bytecode.unwrap(), &mut f, bincode::config::standard())
-            .map_err(|e| Error::other(e.to_string()))?;
-
-        log!(TraceLogLevel::LOG_INFO, "Compilation was successful");
-        Ok(())
-    } else {
-        let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-        for error in errors {
-            error_buf.push('\n');
-            error_buf.push_str(&error.to_string());
-        }
-
-        log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-        Err(Error::other("Compilation failed"))
-    }
-}
-
 fn main() -> Result<(), Error> {
     let args_map: HashMap<String, usize> = env::args().enumerate().map(|(i, x)| (x, i)).collect();
 
@@ -3562,8 +3576,14 @@ fn main() -> Result<(), Error> {
     }).expect("Program directory OnceCell was already set");
 
     #[cfg(feature = "dev")]
-    if args_map.contains_key("--compile-algos") {
-        return compile_algos();
+    {
+        if args_map.contains_key("--compile-algos") {
+            return dev::compile_algos();
+        }
+
+        if args_map.contains_key("--load-algos") {
+            return dev::load_algos();
+        }
     }
 
     // avoids raylib unloading messages flood when the program panics
