@@ -45,23 +45,14 @@ visual! {
             }
 
             let value = shared.array[i].pos_value() as f64;
-
-            let color = {
-                if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
-                    color
-                } else {
-                    Color::color_from_hsv((shared.array[i].idx as f64 * self.color_const) as f32 * 360.0, 1.0, 1.0)
-                }
-            };
-
             let y = (value * self.dots_visual.base.line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.resolution_y - y - width as i32, 
-                width as i32, 
-                width as i32, 
-                color
-            );
+
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, color == self.highlight_color(), draw);
+            } else {
+                let color = Color::color_from_hsv((shared.array[i].idx as f64 * self.color_const) as f32 * 360.0, 1.0, 1.0);
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, false, draw);
+            }
 
             x += width;
             last_i = i;
@@ -85,23 +76,14 @@ visual! {
             }
 
             let value = shared.aux[i].pos_value() as f64;
-
-            let color = {
-                if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
-                    color
-                } else {
-                    Color::color_from_hsv((shared.aux[i].idx as f64 * self.aux_color_const) as f32 * 360.0, 1.0, 1.0)
-                }
-            };
-
             let y = (value * self.dots_visual.base.aux_line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.aux_resolution_y - y - width as i32, 
-                width as i32, 
-                width as i32, 
-                color
-            );
+
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, color == self.highlight_color(), draw);
+            } else {
+                let color = Color::color_from_hsv((shared.aux[i].idx as f64 * self.aux_color_const) as f32 * 360.0, 1.0, 1.0);
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, false, draw);
+            }
 
             x += width;
             last_i = i;

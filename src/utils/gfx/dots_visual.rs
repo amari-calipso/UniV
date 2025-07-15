@@ -1,4 +1,6 @@
-use raylib::RaylibHandle;
+use std::cmp::max;
+
+use raylib::{color::Color, prelude::RaylibDraw, RaylibHandle};
 
 use crate::Shared;
 
@@ -9,6 +11,8 @@ pub struct DotsVisual {
 }
 
 impl DotsVisual {
+    pub const MIN_HIGHLIGHT_SIZE: usize = 4;
+
     pub fn new() -> Self {
         DotsVisual { 
             base: LineVisual::new() 
@@ -32,5 +36,32 @@ impl DotsVisual {
     pub fn on_aux_off(&mut self, shared: &Shared, rl: &RaylibHandle) {
         self.base.on_aux_off(shared, rl);
         self.base.line_length_mlt = (self.base.resolution_y as f64 - self.base.line_width) / (shared.array_max + 1) as f64;
+    }
+
+    pub fn draw_dot(&self, mut x: usize, y: i32, width: usize, resolution_y: i32, color: Color, is_highlight: bool, draw: &mut impl RaylibDraw) {
+        if is_highlight {
+            let w = max(Self::MIN_HIGHLIGHT_SIZE, width);
+            let hdiff = (w - width) / 2;
+
+            if x >= hdiff {
+                x -= hdiff;
+            }
+
+            draw.draw_rectangle(
+                x as i32, 
+                resolution_y - y - hdiff as i32 - width as i32, 
+                w as i32, 
+                w as i32, 
+                color
+            );
+        } else {
+            draw.draw_rectangle(
+                x as i32, 
+                resolution_y - y - width as i32, 
+                width as i32, 
+                width as i32, 
+                color
+            );
+        }
     }
 }
