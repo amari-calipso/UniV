@@ -10,18 +10,20 @@ pub enum Statement {
     Pop,
     Reset { type_: Token },
     Define { name: Token, value: Expression },
-    RunShuffle { kw: Token, name: Expression },
+    RunShuffle { kw: Token, name: Expression, timestamp: bool },
     Describe { value: Expression },
+    Timestamp { kw: Token, value: Expression },
     RunAllSorts { kw: Token, categories: Vec<RunAllSortsCategory> },
     RunAllShuffles { kw: Token, statements: Vec<Statement> },
     RunDistribution { 
         kw: Token, name: Expression, length: Option<Expression>, 
-        unique: Option<Expression> 
+        unique: Option<Expression>, timestamp: bool 
     },
     RunSort { 
         kw: Token, name: Expression, category: Option<Expression>, 
         length: Option<Expression>, speed: Option<Expression>, 
-        speed_scale: Option<Expression>, max_length: Option<Expression>
+        speed_scale: Option<Expression>, max_length: Option<Expression>,
+        timestamp: bool
     }
 }
 

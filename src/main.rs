@@ -145,6 +145,9 @@ struct Render {
 
     pub frame_duration: f64,
 
+    pub recording_duration: Duration,
+    pub timestamp_file: Option<File>,
+
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
 
@@ -378,6 +381,8 @@ impl Render {
         Render {
             active: false,
             frame_duration: 0.0,
+            recording_duration: Duration::ZERO,
+            timestamp_file: None,
             speed_cnt: 0,
             speed_cnt_max: 1,
             ffmpeg: OnceCell::new(),
@@ -464,8 +469,10 @@ macro_rules! render_stats {
             if $slf.settings.internal_info {
                 let target_fps;
                 let dropped_frames;
+                let recording_duration;
                 if $slf.render.active {
                     target_fps = "None".into();
+                    recording_duration = utils::duration_to_hms(&$slf.render.recording_duration);
                     dropped_frames = (
                         1.0 - min(
                             OrderedFloat($slf.settings.render_fps as f64),
@@ -474,6 +481,7 @@ macro_rules! render_stats {
                 } else {
                     target_fps = $slf.target_fps.to_string();
                     dropped_frames = (1.0 - $fps as f64 / $slf.target_fps as f64) * 100.0;
+                    recording_duration = "None".into();
                 }
 
                 utils::gfx::draw_outline_text_right(
@@ -483,12 +491,14 @@ macro_rules! render_stats {
                             "Target FPS: {}\n",
                             "Dropped frames: {:.2}%\n",
                             "Frame: {}\n",
+                            "Recording duration: {}\n",
                             "Current delay: {:.2} ms\n",
                         ),
                         $fps,
                         target_fps,
                         dropped_frames,
                         $slf.frame_n,
+                        recording_duration,
                         $slf.tmp_sleep * 1000.0,
                     ).as_ref(),
                     Vector2 { x: $draw.get_screen_width() as f32 - STATS_POS.x, y: STATS_POS.y },
@@ -927,6 +937,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
+        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         Ok(())
@@ -1926,6 +1937,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
+        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         self.highlights.clear();

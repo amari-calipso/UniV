@@ -12,6 +12,7 @@ pub enum TokenType {
     Unique, Sort, In, Length, Speed, 
     Scaled, By, All, Sorts, Shuffles,
     Visual, Queue, Describe, Max,
+    Timestamp,
 
     EOF
 }

@@ -32,7 +32,8 @@ lazy_static! {
         keywords.insert("maximum",      TokenType::Max);
         keywords.insert("shuffle",      TokenType::Shuffle);
         keywords.insert("describe",     TokenType::Describe);
-        keywords.insert("shuffles",     TokenType::Shuffles);        
+        keywords.insert("shuffles",     TokenType::Shuffles);
+        keywords.insert("timestamp",    TokenType::Timestamp);      
         keywords.insert("distribution", TokenType::Distribution);
         keywords
     };

@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 pub mod lang;
 pub mod gfx;
@@ -148,4 +148,22 @@ macro_rules! with_timer {
             res
         }
     };
+}
+
+pub fn duration_to_hms(duration: &Duration) -> String {
+    let mut s = duration.as_secs();
+    let mut h = 0u8;
+    let mut m = 0u8;
+    
+    while s >= 60 {
+        s -= 60;
+        m += 1;
+    }
+
+    while m >= 60 {
+        m -= 60;
+        h += 1;
+    }
+
+    format!("{:02}:{:02}:{:02}", h, m, s)
 }

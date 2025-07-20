@@ -12,7 +12,7 @@ UniV aims to be the most feature-rich, easy to use, and compatible sorting visua
 - UniV is **convenient**. The user interface is designed to be as intuitive as possible, without shoving too many things in front of the user. It has a bunch of quality of life features to make experimentation easier and visualization more enjoyable, and it even provides [an extremely simple custom scripting language for automating visualizations](#the-univ-automation-language), perfect for creating videos without needing to interact with the program, or for creating complex shuffles by combining existing ones!
 - UniV is **universal**. As mentioned before, you can run a lot of things on UniV, as long as it has a translation layer for your language and API;
 - UniV is **modular**. The architecture is built in such a way that it's easy to add new components to UniV. Want a new visual style? or a new sound system perhaps? a new algorithm? check how easy it is to [add it yourself](#how-to-add-an-algorithm)!
-- UniV is **great for creating videos**. Thanks to its integration with [ffmpeg](https://ffmpeg.org/), UniV is able to produce high quality videos without needing any recording software, and without any frame drops, as the video is generated from scratch instead of it being a screen recording;
+- UniV is **great for creating videos**. Thanks to its integration with [ffmpeg](https://ffmpeg.org/), UniV is able to produce high quality videos without needing any recording software, and without any frame drops, as the video is generated from scratch instead of it being a screen recording. Render mode even provides an option to automatically generate timestamps for your videos, that way it's very easy to add them to the description of your video in platforms such as YouTube;
 - UniV loves **open source**. Contributions and forks are more than welcome, and UniV attempts to be as open and accessible as possible for developers.
 
 # Run or build
@@ -146,6 +146,24 @@ run distribution "Linear" with length 256
 run shuffle "Reversed"
 set speed BUBBLE_SORT_SPEED
 run sort "Bubble Sort" in "Exchange Sorts"
+```
+
+You can generate timestamps for relevant moments of your automation, that will later be saved to a file if the user is using render mode:
+```
+run distribution "Linear" with length 256
+timestamp "First we shuffle..."
+run shuffle "Random"
+set speed 80
+timestamp "... Then we sort!"
+run sort "Bubble Sort" in "Exchange Sorts"
+```
+
+Timestamps can also be generated automatically by UniV, without specifying a message.
+```
+run distribution "Linear" with length 256
+run shuffle "Random" with timestamp // will output HH:MM:SS - Shuffle: Random
+set speed 80
+run sort "Bubble Sort" in "Exchange Sorts" with timestamp // will output HH:MM:SS - Bubble Sort
 ```
 
 You can also `describe` your automation, to show a summary of what the automation does in UniV's GUI

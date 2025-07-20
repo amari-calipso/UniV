@@ -1,11 +1,11 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, fs::File, io::{Error, Write}, rc::Rc, time::Duration};
 
 use ast::{Expression, Statement};
 use parser::Parser;
 use scanner::Scanner;
 use tokens::{Token, TokenType};
 
-use crate::{univm::object::{ExecutionInterrupt, UniLValue}, utils::{lang::{traceback_part, AstPos}, object::{expect_int, expect_number, expect_string}}, UniV};
+use crate::{univm::object::{ExecutionInterrupt, UniLValue}, utils::{duration_to_hms, lang::{traceback_part, AstPos}, object::{expect_int, expect_number, expect_string}}, UniV};
 
 mod scanner;
 mod tokens;
@@ -95,6 +95,27 @@ impl AutomationInterpreter {
 }
 
 impl UniV {
+    fn write_to_timestamp_file_inner(&mut self, text: &str) -> Result<(), Error> {
+        if let Some(file) = &mut self.render.timestamp_file {
+            file.write_all(duration_to_hms(&self.render.recording_duration).as_bytes())?;
+            file.write_all(b" - ")?;
+            file.write_all(text.as_bytes())?;
+            file.write_all(b"\n")?;
+        }
+
+        Ok(())
+    }
+
+    fn write_to_timestamp_file(&mut self, text: &str, tok: &Token) -> Result<(), ExecutionInterrupt> {
+        self.write_to_timestamp_file_inner(text)
+            .map_err(|e| self.automation_interpreter.create_exception_tok(
+                format!("Failed to write to timestamp file: {}", e.to_string()).into(), 
+                tok
+            ))?;
+
+        Ok(())
+    }
+
     fn evaluate_automation_expression(&mut self, expression: &Expression) -> Result<UniLValue, ExecutionInterrupt> {
         match expression {
             Expression::Float(token) => {
@@ -159,9 +180,17 @@ impl UniV {
                 let value = self.evaluate_automation_expression(value)?;
                 self.automation_interpreter.variables.insert(Rc::clone(&name.lexeme), value);
             }
-            Statement::RunShuffle { kw, name } => {
+            Statement::Timestamp { kw, value } => {
+                let text = self.evaluate_automation_expression(&value)?.stringify();
+                self.write_to_timestamp_file(&text, kw)?;
+            }
+            Statement::RunShuffle { kw, name, timestamp } => {
                 let value = self.evaluate_automation_expression(name)?;
                 let name = expect_string(&value, "shuffle name", self)?;
+
+                if *timestamp || self.automation_interpreter.in_run_all_shuffles {
+                    self.write_to_timestamp_file(format!("Shuffle: {}", name).as_str(), kw)?;
+                }
 
                 if self.automation_interpreter.in_run_all_shuffles {
                     let shuffle_id;
@@ -187,7 +216,7 @@ impl UniV {
                     self.run_shuffle(&name)?;
                 }
             }
-            Statement::RunDistribution { kw, name, length, unique } => {
+            Statement::RunDistribution { kw, name, length, unique, timestamp } => {
                 let value = self.evaluate_automation_expression(name)?;
                 let name = expect_string(&value, "distribution name", self)?;
 
@@ -214,6 +243,10 @@ impl UniV {
                         Rc::from("Unique amount cannot be greater than array length"), 
                         kw
                     ));
+                }
+
+                if *timestamp {
+                    self.write_to_timestamp_file(&name, kw)?;
                 }
 
                 self.run_distribution(&name, length, unique)?;
@@ -248,9 +281,13 @@ impl UniV {
 
                 self.automation_interpreter.in_run_all_shuffles = false;
             }
-            Statement::RunSort { kw, name, category, length, speed, speed_scale, max_length } => {
+            Statement::RunSort { kw, name, category, length, speed, speed_scale, max_length, timestamp } => {
                 let value = self.evaluate_automation_expression(name)?;
                 let name = expect_string(&value, "sort name", self)?;
+
+                if *timestamp || self.automation_interpreter.run_all_sorts.is_some() {
+                    self.write_to_timestamp_file(&name, kw)?;
+                }
 
                 if let Some(run_all_category) = self.automation_interpreter.run_all_sorts.clone() {
                     let length = {
@@ -435,8 +472,25 @@ impl UniV {
         Ok(script)
     }
 
+    fn init_timestamp_file(&mut self) -> Result<(), ExecutionInterrupt> {
+        if self.render.active {
+            self.render.recording_duration = Duration::ZERO;
+
+            if self.settings.save_timestamps {
+                self.render.timestamp_file = Some(
+                    File::create("timestamps.txt")
+                        .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn execute_automation(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<(), ExecutionInterrupt> {
         let script = self.parse_automation(source, filename)?;
+        
+        self.init_timestamp_file()?;
 
         for statement in script {
             self.evaluate_automation_statement(&statement)?;
