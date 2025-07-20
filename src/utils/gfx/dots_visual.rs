@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use raylib::{color::Color, prelude::RaylibDraw, RaylibHandle};
 
 use crate::Shared;
@@ -11,7 +9,7 @@ pub struct DotsVisual {
 }
 
 impl DotsVisual {
-    pub const MIN_HIGHLIGHT_SIZE: usize = 4;
+    pub const MIN_HIGHLIGHT_SIZE: usize = 10;
 
     pub fn new() -> Self {
         DotsVisual { 
@@ -40,7 +38,14 @@ impl DotsVisual {
 
     pub fn draw_dot(&self, mut x: usize, y: i32, width: usize, resolution_y: i32, color: Color, is_highlight: bool, draw: &mut impl RaylibDraw) {
         if is_highlight {
-            let w = max(Self::MIN_HIGHLIGHT_SIZE, width);
+            let w = {
+                if width < Self::MIN_HIGHLIGHT_SIZE {
+                    width * 2
+                } else {
+                    width
+                }
+            };
+
             let hdiff = (w - width) / 2;
 
             if x >= hdiff {

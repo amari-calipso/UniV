@@ -38,31 +38,31 @@ class TreeSort:
     "Tree Sort",
     {
         "Linear": [
-            "Reversed", "Reversed Sawtooth", "No Shuffle", "Sawtooth", 
+            "Reversed", "Reversed Sawtooth", "No shuffle", "Sawtooth", 
             "Few random", "Final Merge Pass", "Real Final Merge", "Noisy",
             "Scrambled Tail", "Scrambled Head", "Sorted", "Quicksort Adversary",
             "Grailsort Adversary"
         ],
         "Quadratic": [
-            "Reversed", "Reversed Sawtooth", "No Shuffle", "Sawtooth", 
+            "Reversed", "Reversed Sawtooth", "No shuffle", "Sawtooth", 
             "Few random", "Final Merge Pass", "Real Final Merge", "Noisy",
             "Scrambled Tail", "Scrambled Head", "Sorted", "Quicksort Adversary",
             "Grailsort Adversary"
         ],
         "Quintic":   [
-            "Random", "Reversed", "Reversed Sawtooth", "No Shuffle", "Sawtooth", 
+            "Random", "Reversed", "Reversed Sawtooth", "No shuffle", "Sawtooth", 
             "Few random", "Final Merge Pass", "Real Final Merge", "Noisy",
             "Scrambled Tail", "Scrambled Head", "Sorted", "Quicksort Adversary",
             "Grailsort Adversary"
         ],
         "Sine Wave": [
-            "Reversed", "Reversed Sawtooth", "No Shuffle", "Sawtooth", 
+            "Reversed", "Reversed Sawtooth", "No shuffle", "Sawtooth", 
             "Few random", "Final Merge Pass", "Real Final Merge", "Noisy",
             "Scrambled Tail", "Scrambled Head", "Sorted", "Quicksort Adversary",
             "Grailsort Adversary"
         ],
         "Perlin Noise": [
-            "Reversed", "Reversed Sawtooth", "No Shuffle", "Sawtooth", 
+            "Reversed", "Reversed Sawtooth", "No shuffle", "Sawtooth", 
             "Few random", "Final Merge Pass", "Real Final Merge", "Noisy",
             "Scrambled Tail", "Scrambled Head", "Sorted", "Quicksort Adversary",
             "Grailsort Adversary"
