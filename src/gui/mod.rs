@@ -168,7 +168,6 @@ impl Gui {
                 FontSource::DefaultFontData { config: None }
             ]);
 
-        self.renderer.take();
         let _ = self.renderer.set(
             raylib_imgui_rs::Renderer::create(&mut self.imgui, rl, thread)
         );
@@ -180,8 +179,7 @@ impl Gui {
             .expect("Could not load render texture");
         rl.begin_texture_mode(thread, &mut background).clear_background(Color::BLACK);
         
-        self.background.take();
-        self.background.set(background).unwrap();
+        let _ = self.background.set(background);
 
         self.resolution_x = width as f32;
         self.resolution_y = height as f32;

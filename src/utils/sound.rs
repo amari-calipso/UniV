@@ -66,8 +66,7 @@ impl BaseSoundFontEngine {
             0
         );
 
-        self.synthesizer.take();
-        self.synthesizer.set(synth).unwrap();
+        let _ = self.synthesizer.set(synth);
     }
 
     pub fn play(&mut self, value: i64, max: i64, length: usize) -> Vec<i16> {

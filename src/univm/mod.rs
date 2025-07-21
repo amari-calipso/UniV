@@ -519,8 +519,7 @@ impl UniVM {
     }
 
     pub fn set_bytecode(&mut self, bytecode: Bytecode) {
-        self.bytecode.take();
-        self.bytecode.set(bytecode).unwrap();
+        let _ = self.bytecode.set(bytecode);
     }
 
     pub fn create_exception(&mut self, value: UniLValue) -> ExecutionInterrupt {

@@ -2274,8 +2274,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_sorts.take();
-                    self.run_all_sorts.set(automation).unwrap();
+                    let _ = self.run_all_sorts.set(automation);
                 }
             }
         }
@@ -2284,8 +2283,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_shuffles.take();
-                    self.run_all_shuffles.set(automation).unwrap();
+                    let _ = self.run_all_shuffles.set(automation);
                 }
             }
         }
@@ -2346,11 +2344,10 @@ impl UniV {
             let width = rl.get_screen_width() as u32;
             let height = rl.get_screen_height() as u32;
 
-            self.render_texture.take();
-            self.render_texture.set(
+            let _ = self.render_texture.set(
                 rl.load_render_texture(get_expect!(self.rl_thread), width, height)
                     .expect("Could not load render texture")
-            ).unwrap();
+            );
         }
 
         log!(TraceLogLevel::LOG_INFO, "Loading font");
