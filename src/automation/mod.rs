@@ -285,10 +285,6 @@ impl UniV {
                 let value = self.evaluate_automation_expression(name)?;
                 let name = expect_string(&value, "sort name", self)?;
 
-                if *timestamp || self.automation_interpreter.run_all_sorts.is_some() {
-                    self.write_to_timestamp_file(&name, kw)?;
-                }
-
                 if let Some(run_all_category) = self.automation_interpreter.run_all_sorts.clone() {
                     let length = {
                         if let Some(length) = length {
@@ -371,6 +367,16 @@ impl UniV {
                         speed /= speed_scale;
                     }
 
+                    let full_name = Rc::clone(
+                        &self.sorts.get(&run_all_category)
+                            .expect("GUI sort data was not syncronized with UniV sort data")
+                            .get(&name)
+                            .expect("GUI sort data was not syncronized with UniV sort data")
+                            .name
+                    );
+
+                    self.write_to_timestamp_file(&full_name, kw)?;
+
                     self.runall_sorting_sequence(
                         self.gui.run_all_sorts.distribution, 
                         self.gui.run_all_sorts.shuffle, 
@@ -385,6 +391,27 @@ impl UniV {
                     if let Some(category) = category {
                         let value = self.evaluate_automation_expression(category)?;
                         let category = expect_string(&value, "category", self)?;
+
+                        if *timestamp {
+                            let full_name = {
+                                if let Some(sort_category) = self.sorts.get(&category) {
+                                    if let Some(sort_data) = sort_category.get(&name) {
+                                        Rc::clone(&sort_data.name)
+                                    } else {
+                                        return Err(self.automation_interpreter.create_exception_tok(format!(
+                                            "Unknown sort \"{}\"", name
+                                        ).into(), kw));
+                                    }
+                                } else {
+                                    return Err(self.automation_interpreter.create_exception_tok(format!(
+                                        "Unknown sort category \"{}\"", category
+                                    ).into(), kw));
+                                } 
+                            };
+
+                            self.write_to_timestamp_file(&full_name, kw)?;              
+                        }
+
                         self.run_sort(&category, &name)?;
                     } else {
                         return Err(self.automation_interpreter.create_exception_tok(
