@@ -96,7 +96,7 @@ impl AutomationInterpreter {
 
 impl UniV {
     fn write_to_timestamp_file_inner(&mut self, text: &str) -> Result<(), Error> {
-        if let Some(file) = &mut self.render.timestamp_file {
+        if let Some(file) = self.render.timestamp_file.get_mut() {
             file.write_all(duration_to_hms(&self.render.recording_duration).as_bytes())?;
             file.write_all(b" - ")?;
             file.write_all(text.as_bytes())?;
@@ -246,7 +246,7 @@ impl UniV {
                 }
 
                 if *timestamp {
-                    self.write_to_timestamp_file(&name, kw)?;
+                    self.write_to_timestamp_file(format!("Distribution: {}", name).as_str(), kw)?;
                 }
 
                 self.run_distribution(&name, length, unique)?;
@@ -477,17 +477,18 @@ impl UniV {
             self.render.recording_duration = Duration::ZERO;
 
             if self.settings.save_timestamps {
-                self.render.timestamp_file = Some(
+                self.render.timestamp_file.take();
+                self.render.timestamp_file.set(
                     File::create("timestamps.txt")
                         .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
-                );
+                ).unwrap();
             }
         }
 
         Ok(())
     }
 
-    pub fn execute_automation(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<(), ExecutionInterrupt> {
+    fn execute_automation_inner(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<(), ExecutionInterrupt> {
         let script = self.parse_automation(source, filename)?;
         
         self.init_timestamp_file()?;
@@ -497,6 +498,12 @@ impl UniV {
         }
 
         Ok(())
+    }
+
+    pub fn execute_automation(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<(), ExecutionInterrupt> {
+        let ret = self.execute_automation_inner(source, filename);
+        self.render.timestamp_file.take(); // release the timestamps file, if any
+        ret
     }
 
     pub fn get_automation_description(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<String, ExecutionInterrupt> {

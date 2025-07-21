@@ -146,7 +146,7 @@ struct Render {
     pub frame_duration: f64,
 
     pub recording_duration: Duration,
-    pub timestamp_file: Option<File>,
+    pub timestamp_file: OnceCell<File>,
 
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
@@ -382,7 +382,7 @@ impl Render {
             active: false,
             frame_duration: 0.0,
             recording_duration: Duration::ZERO,
-            timestamp_file: None,
+            timestamp_file: OnceCell::new(),
             speed_cnt: 0,
             speed_cnt_max: 1,
             ffmpeg: OnceCell::new(),
