@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{Error, Write}, rc::Rc, time::Duration};
+use std::{collections::HashMap, fs::File, io::{Error, Write}, rc::Rc};
 
 use ast::{Expression, Statement};
 use parser::Parser;
@@ -97,7 +97,7 @@ impl AutomationInterpreter {
 impl UniV {
     fn write_to_timestamp_file_inner(&mut self, text: &str) -> Result<(), Error> {
         if let Some(file) = self.render.timestamp_file.get_mut() {
-            file.write_all(duration_to_hms(&self.render.recording_duration).as_bytes())?;
+            file.write_all(duration_to_hms(&self.shared.visual_duration).as_bytes())?;
             file.write_all(b" - ")?;
             file.write_all(text.as_bytes())?;
             file.write_all(b"\n")?;
@@ -499,17 +499,14 @@ impl UniV {
         Ok(script)
     }
 
-    fn init_timestamp_file(&mut self) -> Result<(), ExecutionInterrupt> {
-        if self.render.active {
-            self.render.recording_duration = Duration::ZERO;
+    fn init_automation_state(&mut self) -> Result<(), ExecutionInterrupt> {
+        self.reset_visual_duration();
 
-            if self.settings.save_timestamps {
-                self.render.timestamp_file.take();
-                self.render.timestamp_file.set(
-                    File::create("timestamps.txt")
-                        .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
-                ).unwrap();
-            }
+        if self.render.active && self.settings.save_timestamps {
+            let _ = self.render.timestamp_file.set(
+                File::create("timestamps.txt")
+                    .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
+            );
         }
 
         Ok(())
@@ -518,7 +515,7 @@ impl UniV {
     fn execute_automation_inner(&mut self, source: Rc<str>, filename: Rc<str>) -> Result<(), ExecutionInterrupt> {
         let script = self.parse_automation(source, filename)?;
         
-        self.init_timestamp_file()?;
+        self.init_automation_state()?;
 
         for statement in script {
             self.evaluate_automation_statement(&statement)?;

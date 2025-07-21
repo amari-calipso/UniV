@@ -131,6 +131,7 @@ pub struct Shared {
 
     pub fps: u32,
     pub reverb: bool,
+    pub visual_duration: Duration,
 }
 
 #[derive(Debug)]
@@ -145,14 +146,12 @@ struct Render {
 
     pub frame_duration: f64,
 
-    pub recording_duration: Duration,
-    pub timestamp_file: OnceCell<File>,
-
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
 
     pub ffmpeg: OnceCell<FFMpeg>,
-    pub ffmpeg_executable: PathBuf
+    pub ffmpeg_executable: PathBuf,
+    pub timestamp_file: OnceCell<File>,
 }
 
 struct Audio {
@@ -261,6 +260,8 @@ pub struct UniV {
     tmp_sleep:   f64,
     past_sleep:  f64,
     target_fps:  u32,
+    /// Marks the timestamp in which the current visual started
+    visual_start: Instant,
 
     font:      OnceCell<WeakFont>,
     font_size: usize,
@@ -350,6 +351,7 @@ impl UniV {
             tmp_sleep: 0.0,
             past_sleep: 0.0,
             target_fps: 0,
+            visual_start: Instant::now(),
 
             font: OnceCell::new(),
             font_size: 12
@@ -371,7 +373,8 @@ impl Shared {
             aux_heatmap: HeatMap::new(),
 
             fps: REFERENCE_FRAMERATE,
-            reverb: false
+            reverb: false,
+            visual_duration: Duration::ZERO,
         }
     }
 }
@@ -381,7 +384,6 @@ impl Render {
         Render {
             active: false,
             frame_duration: 0.0,
-            recording_duration: Duration::ZERO,
             timestamp_file: OnceCell::new(),
             speed_cnt: 0,
             speed_cnt_max: 1,
@@ -469,10 +471,8 @@ macro_rules! render_stats {
             if $slf.settings.internal_info {
                 let target_fps;
                 let dropped_frames;
-                let recording_duration;
                 if $slf.render.active {
                     target_fps = "None".into();
-                    recording_duration = utils::duration_to_hms(&$slf.render.recording_duration);
                     dropped_frames = (
                         1.0 - min(
                             OrderedFloat($slf.settings.render_fps as f64),
@@ -481,7 +481,6 @@ macro_rules! render_stats {
                 } else {
                     target_fps = $slf.target_fps.to_string();
                     dropped_frames = (1.0 - $fps as f64 / $slf.target_fps as f64) * 100.0;
-                    recording_duration = "None".into();
                 }
 
                 utils::gfx::draw_outline_text_right(
@@ -491,14 +490,14 @@ macro_rules! render_stats {
                             "Target FPS: {}\n",
                             "Dropped frames: {:.2}%\n",
                             "Frame: {}\n",
-                            "Recording duration: {}\n",
+                            "Visual duration: {}\n",
                             "Current delay: {:.2} ms\n",
                         ),
                         $fps,
                         target_fps,
                         dropped_frames,
                         $slf.frame_n,
-                        recording_duration,
+                        utils::duration_to_hms(&$slf.shared.visual_duration),
                         $slf.tmp_sleep * 1000.0,
                     ).as_ref(),
                     Vector2 { x: $draw.get_screen_width() as f32 - STATS_POS.x, y: STATS_POS.y },
@@ -826,6 +825,7 @@ impl UniV {
         }
 
         self.heatmap_cnt += 1;
+        self.shared.visual_duration = self.visual_start.elapsed();
         self.frame_n = self.frame_n.wrapping_add(1);
         Ok(())
     }
@@ -937,7 +937,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
-        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
+        self.shared.visual_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         Ok(())
@@ -1757,6 +1757,7 @@ impl UniV {
         }
 
         self.heatmap_cnt += 1;
+        self.shared.visual_duration = self.visual_start.elapsed();
         self.frame_n = self.frame_n.wrapping_add(1);
         self.highlights.clear();
 
@@ -1937,7 +1938,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
-        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
+        self.shared.visual_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         self.highlights.clear();
@@ -2274,8 +2275,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_sorts.take();
-                    self.run_all_sorts.set(automation).unwrap();
+                    let _ = self.run_all_sorts.set(automation);
                 }
             }
         }
@@ -2284,8 +2284,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_shuffles.take();
-                    self.run_all_shuffles.set(automation).unwrap();
+                    let _ = self.run_all_shuffles.set(automation);
                 }
             }
         }
@@ -2346,11 +2345,10 @@ impl UniV {
             let width = rl.get_screen_width() as u32;
             let height = rl.get_screen_height() as u32;
 
-            self.render_texture.take();
-            self.render_texture.set(
+            let _ = self.render_texture.set(
                 rl.load_render_texture(get_expect!(self.rl_thread), width, height)
                     .expect("Could not load render texture")
-            ).unwrap();
+            );
         }
 
         log!(TraceLogLevel::LOG_INFO, "Loading font");
@@ -2664,10 +2662,17 @@ impl UniV {
         self.gui.run(get_expect_mut!(self.rl_handle), get_expect!(self.rl_thread))
     }
 
+    pub fn reset_visual_duration(&mut self) {
+        self.visual_start = Instant::now();
+        self.shared.visual_duration = Duration::ZERO;
+    }
+
     fn run_sorting_sequence(
         &mut self, distribution_id: i32, shuffle_id: i32, category_id: i32, sort_id: i32,
         length: usize, unique: usize, speed: f64
     ) -> Result<(), ExecutionInterrupt> {
+        self.reset_visual_duration();
+
         self.run_distribution(
             &Rc::clone(&self.gui.distributions[distribution_id as usize]),
             length,

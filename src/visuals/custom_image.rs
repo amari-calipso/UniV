@@ -46,9 +46,7 @@ impl CustomImage {
                 let width  = rl.get_screen_width();
                 let height = rl.get_screen_height();
                 image.resize(width, height);
-
-                self.image.take();
-                self.image.set(image).unwrap();
+                let _ = self.image.set(image);
             }
             Err(e) => {
                 gui.build_fn = Gui::popup;
@@ -71,9 +69,7 @@ impl CustomImage {
         let height = rl.get_screen_height();
         image.resize(width, height);
         image.set_format(PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-
-        self.image.take();
-        self.image.set(image).unwrap();
+        let _ = self.image.set(image);
     }
 }
 

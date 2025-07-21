@@ -1,9 +1,9 @@
 use raylib::{color::Color, ffi::Vector2};
 
-use crate::{utils::gfx::line_visual::LineVisual, visual};
+use crate::{utils::gfx::line_visual::{AnimatedLineVisual, LineVisual}, visual};
 
 pub struct WhiteBarGraph {
-    line_visual: LineVisual
+    line_visual: AnimatedLineVisual
 }
 
 visual! {
@@ -12,7 +12,7 @@ visual! {
 
     WhiteBarGraph::new(self) {
         WhiteBarGraph { 
-            line_visual: LineVisual::new() 
+            line_visual: AnimatedLineVisual::new() 
         }
     }
 
@@ -29,11 +29,13 @@ visual! {
     }
 
     draw(shared, draw, indices) {
+        self.line_visual.update(shared);
+
         let mut last_i = 0usize;
         let mut x = 0usize;
 
         for i in 0 .. shared.array.len() {
-            let width = (self.line_visual.line_width * (i + 1) as f64) as usize - x;
+            let width = (self.line_visual.base.line_width * (i + 1) as f64) as usize - x;
             if width == 0 {
                 continue;
             }
@@ -46,10 +48,10 @@ visual! {
                 }
             };
 
-            let y = (shared.array[i].pos_value() as f64 * self.line_visual.line_length_mlt) as i32;
+            let y = (shared.array[i].pos_value() as f64 * self.line_visual.base.line_length_mlt) as i32;
             draw.draw_rectangle(
                 x as i32, 
-                self.line_visual.resolution_y - y, 
+                self.line_visual.base.resolution_y - y, 
                 width as i32, 
                 y, 
                 color
@@ -58,12 +60,18 @@ visual! {
             x += width;
             last_i = i;
         }
+
+        if self.line_visual.is_animating() {
+            self.draw_aux(shared, draw, indices);
+        }
     }
 
     draw_aux(shared, draw, indices) {
+        self.line_visual.update(shared);
+
         draw.draw_rectangle(
             0, 0, 
-            self.line_visual.resolution_x, self.line_visual.aux_resolution_y, 
+            self.line_visual.base.resolution_x, self.line_visual.base.aux_resolution_y, 
             Color::BLACK
         );
 
@@ -71,7 +79,7 @@ visual! {
         let mut x = 0usize;
 
         for i in 0 .. shared.aux.len() {
-            let width = (self.line_visual.aux_line_width * (i + 1) as f64) as usize - x;
+            let width = (self.line_visual.base.aux_line_width * (i + 1) as f64) as usize - x;
             if width == 0 {
                 continue;
             }
@@ -84,10 +92,10 @@ visual! {
                 }
             };
 
-            let y = (shared.aux[i].pos_value() as f64 * self.line_visual.aux_line_length_mlt) as i32;
+            let y = (shared.aux[i].pos_value() as f64 * self.line_visual.base.aux_line_length_mlt) as i32;
             draw.draw_rectangle(
                 x as i32, 
-                self.line_visual.aux_resolution_y - y, 
+                self.line_visual.base.aux_resolution_y - y, 
                 width as i32, 
                 y, 
                 color
@@ -98,8 +106,8 @@ visual! {
         }
 
         draw.draw_line_ex(
-            Vector2 { x: 0.0, y: self.line_visual.aux_resolution_y as f32 }, 
-            Vector2 { x: self.line_visual.resolution_x as f32, y: self.line_visual.aux_resolution_y as f32 },
+            Vector2 { x: 0.0, y: self.line_visual.base.aux_resolution_y as f32 }, 
+            Vector2 { x: self.line_visual.base.resolution_x as f32, y: self.line_visual.base.aux_resolution_y as f32 },
             LineVisual::AUX_LINE_WIDTH,
             LineVisual::AUX_LINE_COLOR
         );
