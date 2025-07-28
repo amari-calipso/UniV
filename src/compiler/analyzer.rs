@@ -152,6 +152,11 @@ impl Analyzer {
                     return UniLType::String;
                 }
             }
+            UniLType::List => {
+                if matches!(right, UniLType::Int) {
+                    return UniLType::List;
+                }
+            }
             _ => ()
         }
 
