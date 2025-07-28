@@ -151,6 +151,7 @@ impl std::fmt::Debug for ExceptionHandler {
     }
 }
 
+#[derive(Debug)]
 pub struct Task {
     pub ip: u64,
     pub environment: Rc<RefCell<Environment>>,
@@ -484,14 +485,17 @@ macro_rules! load_name {
 impl UniVM {
     const TIME_SLICE_INSTRUCTIONS: usize = 1024;
 
-    pub fn new() -> Self {
+    fn load_globals() -> Environment {
         log!(TraceLogLevel::LOG_INFO, "Loading API layers");
         let mut globals = Environment::new();
         api_layers::define(&mut globals);
         log!(TraceLogLevel::LOG_INFO, "{} globals loaded", globals.len());
+        globals
+    }
 
+    pub fn new() -> Self {
         Self {
-            globals: Rc::new(RefCell::new(globals)),
+            globals: Rc::new(RefCell::new(Self::load_globals())),
             bytecode: OnceCell::new(),
             delegate_call: false,
             return_values: HashMap::default(),
@@ -501,9 +505,16 @@ impl UniVM {
         }
     }
 
+    pub fn reload_globals(&mut self) {
+        self.globals.replace(Self::load_globals());
+    }
+
     pub fn reset(&mut self) {
         VM_TASKS.with_borrow_mut(|tasks| tasks.clear());
         self.return_values.clear();
+        self.scheduled_tasks.clear();
+        self.started_tasks.clear();
+        self.delegate_call = false;        
         self.task_id = 0;
     }
 

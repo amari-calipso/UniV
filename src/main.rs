@@ -2515,6 +2515,7 @@ impl UniV {
         self.loading_message("Unloading algorithms...")?;
 
         self.vm.reset();
+        self.vm.reload_globals();
         self.distributions.clear();
         self.shuffles.clear();
         self.sorts.clear();
@@ -2799,6 +2800,7 @@ impl UniV {
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", formatted.as_str()).unwrap();
                 self.run_gui()?;
+                self.reset();
             } else if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                 return Err(e); // propagate stopalgorithm so that it stops the entire sequence
             }
@@ -2811,6 +2813,7 @@ impl UniV {
         self.keep_empty_frames = false;
         self.reset_speed();
         self.marks.clear();
+        self.highlights.clear();
         self.reset_aux();
         self.reset_heatmaps();
     }
