@@ -695,8 +695,11 @@ impl Compiler {
                 ctx.run(|ctx| self.compile_one(&object, ctx)).await;
 
                 let type_idx = self.name_idx(&name.lexeme);
+
+                let previous_algo_type = self.last_algo_type.clone();
                 self.last_algo_type = Some(type_idx);
                 ctx.run(|ctx| self.compile_one(&function, ctx)).await;
+                self.last_algo_type = previous_algo_type;
             }
         }
     }
@@ -731,5 +734,6 @@ pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<B
 
     let mut compiler = Compiler::new();
     compiler.compile(expressions);
+    println!("{}", compiler.output.disassemble());
     Ok(compiler.output)
 }
