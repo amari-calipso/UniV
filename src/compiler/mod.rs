@@ -666,6 +666,8 @@ impl Compiler {
                 }, op);
             }
             Expression::Function { name, params, body, .. } => {
+                let algorithm_type = self.last_algo_type.take();
+
                 let function_decl_idx = self.output.instructions.len();
                 self.push_instruction(Instruction::Null, expr); // placeholder
                 let skip_function_jmp_idx = self.output.instructions.len();
@@ -683,7 +685,7 @@ impl Compiler {
                 self.output.instructions[function_decl_idx] = Instruction::FunctionDecl { 
                     address: function_idx as u64, name_idx, 
                     parameters: params.iter().map(|param| self.name_idx(&param.name.lexeme)).collect(), 
-                    algorithm_type: self.last_algo_type.take()
+                    algorithm_type
                 };
 
                 self.output.instructions[function_idx] = Instruction::Catch(self.output.instructions.len() as u64);
@@ -734,6 +736,5 @@ pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<B
 
     let mut compiler = Compiler::new();
     compiler.compile(expressions);
-    println!("{}", compiler.output.disassemble());
     Ok(compiler.output)
 }
