@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq)]
 pub enum TokenType {
     LeftBrace, RightBrace,
@@ -17,25 +15,10 @@ pub enum TokenType {
     EOF
 }
 
-#[derive(Clone, PartialEq, PartialOrd, Hash, Eq)]
-pub struct Token {
-    pub source: Rc<str>,
-    pub filename: Rc<str>,
-    pub type_: TokenType,
-    pub lexeme: Rc<str>,
-    pub pos: usize,
-    pub end: usize,
-    pub line: usize
-}
-
-impl std::fmt::Debug for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Token").field("type_", &self.type_).field("lexeme", &self.lexeme).field("pos", &self.pos).field("end", &self.end).field("line", &self.line).finish()
+impl Default for TokenType {
+    fn default() -> Self {
+        TokenType::Identifier
     }
 }
 
-impl Token {
-    pub fn new(source: Rc<str>, filename: Rc<str>, type_: TokenType, lexeme: Rc<str>, pos: usize, end: usize, line: usize) -> Self {
-        Token { source, filename, type_, lexeme, pos, end, line }
-    }
-}
+pub type Token = alanglib::token::Token<TokenType>;

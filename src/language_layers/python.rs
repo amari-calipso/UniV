@@ -1,18 +1,19 @@
 use std::rc::Rc;
 
+use alanglib::{ast::SourcePos, report::warning};
 use libcst_native::{deflated::{AnnAssign, Arg, Assert, Assign, AssignTarget, AssignTargetExpression, Attribute, AugAssign, AugOp, BaseSlice, BinaryOp, BinaryOperation, BooleanOp, BooleanOperation, Break, Call, ClassDef, CompOp, Comparison, CompoundStatement, ConcatenatedString, Continue, Del, DelTargetExpression, Dict, DictElement, Element, Expr, Float, For, FunctionDef, If, IfExp, IndentedBlock, Index, Integer, Lambda, List, Match, MatchCase, MatchPattern, Module, Name, OrElse, Parameters, Raise, Return, SimpleStatementLine, SimpleStatementSuite, SimpleString, SmallStatement, Statement, Subscript, SubscriptElement, Suite, Try, TryStar, Tuple, TypeAlias, UnaryOp, UnaryOperation, While, With}, tokenizer::TokType};
 
-use crate::{ast_error, language_layer, token_error, token_warning, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, AstPos, BaseASTTransformer, Transform}};
+use crate::{error, language_layer, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer, Transform}};
 
 pub struct ASTTransformer {
     base: BaseASTTransformer,
-    last_pos: AstPos,
+    last_pos: SourcePos,
 }
 
 impl ASTTransformer {
     pub fn new(source: String, filename: Rc<str>) -> Self {
         ASTTransformer {
-            last_pos: AstPos::new(Rc::from(source.as_ref()), Rc::clone(&filename), 0, 0, 0),
+            last_pos: SourcePos::new(Rc::from(source.as_ref()), Rc::clone(&filename), 0, 0, 0),
             base: BaseASTTransformer::new(source, filename)
         }
     }
@@ -72,12 +73,12 @@ impl ASTTransformer {
     #[allow(dead_code)]
     pub fn todo(&mut self, tok: &libcst_native::tokenizer::Token) {
         let tok = self.tok(tok);
-        token_error!(self.base, tok, "Not implemented yet");
+        error!(self.base, tok, "Not implemented yet");
     }
 
     #[allow(dead_code)]
     pub fn todo_ast(&mut self, expr: &Expression) {
-        ast_error!(self.base, expr, "Not implemented yet");
+        error!(self.base, expr, "Not implemented yet");
     }
 }
 
@@ -138,15 +139,15 @@ impl Transform for CompoundStatement<'_, '_> {
 
 fn params_to_vec_of_named_expr(params: &Parameters, t: &mut ASTTransformer, tok: &Token) -> Vec<NamedExpr> {
     if !params.kwonly_params.is_empty() {
-        token_error!(t.base, tok, "Keyword-only parameters are not supported");
+        error!(t.base, tok, "Keyword-only parameters are not supported");
     }
 
     if params.star_arg.is_some() {
-        token_error!(t.base, tok, "*args parameters are not supported");
+        error!(t.base, tok, "*args parameters are not supported");
     }
 
     if params.star_kwarg.is_some() {
-        token_error!(t.base, tok, "**kwargs parameters are not supported");
+        error!(t.base, tok, "**kwargs parameters are not supported");
     }
 
     let mut result = Vec::new();
@@ -154,7 +155,7 @@ fn params_to_vec_of_named_expr(params: &Parameters, t: &mut ASTTransformer, tok:
     for param in params.posonly_params.iter().chain(params.params.iter()) {
         if param.default.is_some() {
             let token = t.tok(param.equal.as_ref().unwrap().tok);
-            token_error!(t.base, token, "Default arguments are not supported");
+            error!(t.base, token, "Default arguments are not supported");
         }
 
         result.push(NamedExpr {
@@ -187,7 +188,7 @@ impl Transform for FunctionDef<'_, '_> {
         let def_tok = t.tok(self.def_tok);
 
         if t.base.depth != 0 {
-            token_warning!(def_tok, "Closures are not supported. This function will be defined in the global scope");
+            warning(&def_tok, "Closures are not supported. This function will be defined in the global scope");
         }
 
         t.base.inc_depth();
@@ -215,7 +216,7 @@ impl Transform for FunctionDef<'_, '_> {
                     match name.lexeme.to_lowercase().as_ref() {
                         "sort" => {
                             if args.len() < 3 || args.len() > 4 {
-                                ast_error!(t.base, decorator, format!("Expecting 3 or 4 arguments for sort decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 3 or 4 arguments for sort decorator but got {}", args.len()).as_str());
                                 return make_null();
                             }
 
@@ -256,7 +257,7 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "shuffle" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for shuffle decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for shuffle decorator but got {}", args.len()).as_str());
                                 return make_null();
                             }
 
@@ -277,7 +278,7 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "distribution" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for distribution decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for distribution decorator but got {}", args.len()).as_str());
                                 return make_null();
                             }
 
@@ -298,7 +299,7 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "pivotselection" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for pivot selection decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for pivot selection decorator but got {}", args.len()).as_str());
                                 return make_null();
                             }
 
@@ -319,7 +320,7 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "rotation" => {
                             if args.len() == 0 || args.len() > 2 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 or 2 arguments for rotation decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 or 2 arguments for rotation decorator but got {}", args.len()).as_str());
                                 return make_null();
                             }
 
@@ -358,11 +359,11 @@ impl Transform for FunctionDef<'_, '_> {
                 }
             } 
 
-            ast_error!(t.base, decorator, "Unsupported decorator");
+            error!(t.base, decorator, "Unsupported decorator");
             function
         } else {
             let tok = t.tok(self.decorators.first().unwrap().at_tok);
-            token_error!(t.base, tok, "Only one decorator is supported");
+            error!(t.base, tok, "Only one decorator is supported");
             function
         }
     }
@@ -469,7 +470,7 @@ impl Transform for For<'_, '_> {
                     if let Expression::Variable { name } = expr {
                         name
                     } else {
-                        ast_error!(t.base, expr, "Only variables are supported as target of for loop");
+                        error!(t.base, expr, "Only variables are supported as target of for loop");
                         t.tok(self.for_tok)
                     }
                 }, 
@@ -512,7 +513,7 @@ macro_rules! transform_try {
         {
             if $node.handlers.len() > 1 {
                 let tok = $t.tok($node.handlers.first().unwrap().except_tok);
-                token_error!($t.base, tok, "Only one exception handler is supported");
+                error!($t.base, tok, "Only one exception handler is supported");
             }
     
             let try_branch;
@@ -576,7 +577,8 @@ impl Transform for With<'_, '_> {
     // https://peps.python.org/pep-0343/
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.items.len() != 1 {
-            ast_error!(t.base, self.items.first().unwrap().item.to_ast(t), "Only one with item is supported");
+            let expr = self.items.first().unwrap().item.to_ast(t);
+            error!(t.base, expr, "Only one with item is supported");
 
             if self.items.len() == 0 {
                 return make_null();
@@ -664,7 +666,7 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
             if x.value.value == "_" {
                 None
             } else {
-                token_error!(t.base, tok, "Unsupported kind of pattern");
+                error!(t.base, tok, "Unsupported kind of pattern");
                 None
             }
         }
@@ -675,7 +677,7 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
                 if name.value == "_" {
                     None
                 } else {
-                    token_error!(t.base, tok, "Unsupported kind of pattern");
+                    error!(t.base, tok, "Unsupported kind of pattern");
                     None
                 }
             } else {
@@ -690,14 +692,14 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
                     }
                 }
 
-                token_error!(t.base, tok, "Unsupported kind of pattern");
+                error!(t.base, tok, "Unsupported kind of pattern");
                 make_null()
             }).collect())
         }
         MatchPattern::Mapping(_) |
         MatchPattern::Sequence(_) | 
         MatchPattern::Class(_) => {
-            token_error!(t.base, tok, "Unsupported kind of pattern");
+            error!(t.base, tok, "Unsupported kind of pattern");
             None
         }
     }
@@ -769,7 +771,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
         match &element {
             Expression::Assign { target, op, value, .. } => {
                 if !matches!(op.type_, TokenType::Walrus) {
-                    token_error!(t.base, op, "Only '=' assignments are allowed in class body");
+                    error!(t.base, op, "Only '=' assignments are allowed in class body");
                 }
 
                 if let Expression::Variable { name } = &**target {
@@ -778,7 +780,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
 
                     fields.push(ObjectField::new(name.clone(), *value.clone(), Some(Expression::Variable { name: any })));
                 } else {
-                    ast_error!(t.base, target, "Only variables are supported as assignment targets in class body");
+                    error!(t.base, target, "Only variables are supported as assignment targets in class body");
                 }
             }
             Expression::Function { name, params, .. } => {
@@ -788,7 +790,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
                 }
 
                 if params.len() == 0 {
-                    token_error!(t.base, name, "Methods must take at least 1 parameter (static methods are not supported)");
+                    error!(t.base, name, "Methods must take at least 1 parameter (static methods are not supported)");
                 }
 
                 let mut tok = name.clone();
@@ -806,7 +808,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
             Expression::Block { expressions, .. } => {
                 get_class_definitions(expressions, class_name, fields, init, t);
             }
-            _ => ast_error!(t.base, element, "Unsupported definition in class body")
+            _ => error!(t.base, element, "Unsupported definition in class body")
         }
     }
 }
@@ -817,12 +819,12 @@ impl Transform for ClassDef<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if !self.decorators.is_empty() {
             let tok = t.tok(self.decorators.first().unwrap().at_tok);
-            token_warning!(tok, "Decorators are not supported on classes. Ignoring");
+            warning(&tok, "Decorators are not supported on classes. Ignoring");
         }
 
         if !self.keywords.is_empty() || !self.bases.is_empty() {
             let tok = t.tok(self.class_tok);
-            token_warning!(tok, "Inheritance is not supported. Ignoring");
+            warning(&tok, "Inheritance is not supported. Ignoring");
         }
 
         let class_name = get_token_from_variable(self.name.to_ast(t));
@@ -904,7 +906,7 @@ impl Transform for SmallStatement<'_, '_> {
             SmallStatement::TypeAlias(x) => x.to_ast(t),
             SmallStatement::Global(x) => {
                 let tok = t.tok(x.tok);
-                token_error!(t.base, tok, "Editing globals from a local scope is not supported");
+                error!(t.base, tok, "Editing globals from a local scope is not supported");
                 make_null()
             } 
         }
@@ -1172,17 +1174,17 @@ impl Transform for AssignTargetExpression<'_, '_> {
             AssignTargetExpression::Subscript(x) => x.to_ast(t),
             AssignTargetExpression::Tuple(x) => {
                 let expr = x.to_ast(t);
-                ast_error!(t.base, expr, "Unsupported assignment target");
+                error!(t.base, expr, "Unsupported assignment target");
                 make_null()
             }
             AssignTargetExpression::List(x) => {
                 let expr = x.to_ast(t);
-                ast_error!(t.base, expr, "Unsupported assignment target");
+                error!(t.base, expr, "Unsupported assignment target");
                 make_null()
             }
             AssignTargetExpression::StarredElement(x) => {
                 let tok = t.tok(x.star_tok);
-                token_error!(t.base, tok, "Unpacking is not supported");
+                error!(t.base, tok, "Unpacking is not supported");
                 make_null()
             }
         }
@@ -1216,7 +1218,7 @@ impl Transform for Subscript<'_, '_> {
         let paren = t.tok(self.lbracket.tok);
 
         if self.slice.len() != 1 {
-            token_error!(t.base, paren, "Slicing is not supported");
+            error!(t.base, paren, "Slicing is not supported");
         }
 
         Expression::Subscript {
@@ -1243,7 +1245,7 @@ impl Transform for BaseSlice<'_, '_> {
             BaseSlice::Index(x) => x.to_ast(t),
             BaseSlice::Slice(x) => {
                 let tok = t.tok(x.first_colon.tok);
-                token_error!(t.base, tok, "Slicing is not supported");
+                error!(t.base, tok, "Slicing is not supported");
                 make_null()
             }
         }
@@ -1256,7 +1258,7 @@ impl Transform for Index<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.star.is_some() {
             let tok = t.tok(self.star_tok.unwrap());
-            token_error!(t.base, tok, "Unsupported syntax");
+            error!(t.base, tok, "Unsupported syntax");
         }
 
         self.value.to_ast(t)
@@ -1484,7 +1486,7 @@ impl Transform for AugAssign<'_, '_> {
                     type_spec = Some(Box::new(Expression::Variable { name: t.tok_with_lexeme(tok, "any") }));
 
                     let tok = t.tok(tok);
-                    token_error!(t.base, tok, "Unsupported operator");
+                    error!(t.base, tok, "Unsupported operator");
                     tok
                 }
             }
@@ -1525,7 +1527,7 @@ impl Transform for Del<'_, '_> {
                 variable: get_token_from_variable(name.to_ast(t))
             }
         } else {
-            token_error!(t.base, kw, "Only deletion of variables is supported");
+            error!(t.base, kw, "Only deletion of variables is supported");
             make_null()
         }
     }
@@ -1536,7 +1538,7 @@ impl Transform for TypeAlias<'_, '_> {
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         let tok = t.tok(self.type_tok);
-        token_error!(t.base, tok, "Type aliases are not supported");
+        error!(t.base, tok, "Type aliases are not supported");
         make_null()
     }
 }
@@ -1576,7 +1578,7 @@ impl Transform for libcst_native::deflated::Expression<'_, '_> {
             Self::Await(_) |
             Self::FormattedString(_) => {
                 let tok = t.tok_from_last_pos();
-                token_error!(t.base, tok, "Unsupported expression");
+                error!(t.base, tok, "Unsupported expression");
                 make_null()
             }
             _ => make_null()
@@ -1665,7 +1667,7 @@ impl Transform for Comparison<'_, '_> {
                         CompOp::IsNot { is_tok, .. } => t.tok_with_type(is_tok, TokenType::BangEqual),
                         CompOp::In { tok } | CompOp::NotIn { in_tok: tok, .. } => {
                             let tok = t.tok(tok);
-                            token_error!(t.base, tok, "Unsupported syntax");
+                            error!(t.base, tok, "Unsupported syntax");
                             continue;
                         }
                     }
@@ -1788,7 +1790,7 @@ impl Transform for BinaryOperation<'_, '_> {
                 }
                 BinaryOp::MatrixMultiply { tok } => {
                     let tok = t.tok(tok);
-                    token_error!(t.base, tok, "Unsupported operator");
+                    error!(t.base, tok, "Unsupported operator");
                     tok
                 }
             }
@@ -1851,7 +1853,7 @@ impl Transform for Element<'_, '_> {
             Element::Simple { value, .. } => value.to_ast(t),
             Element::Starred(x) => {
                 let tok = t.tok(x.star_tok);
-                token_error!(t.base, tok, "Unpacking is not supported");
+                error!(t.base, tok, "Unpacking is not supported");
                 make_null()
             }
         }
@@ -1876,7 +1878,7 @@ impl Transform for Dict<'_, '_> {
                                 tok.set_lexeme(&value);
                                 tok
                             } else {
-                                ast_error!(t.base, key_expr, "Unsupported dictionary key");
+                                error!(t.base, key_expr, "Unsupported dictionary key");
                                 t.tok(colon_tok)
                             }
                         };
@@ -1889,7 +1891,7 @@ impl Transform for Dict<'_, '_> {
                     }
                     DictElement::Starred(x) => {
                         let tok = t.tok(x.star_tok);
-                        token_error!(t.base, tok, "Unpacking is not supported");
+                        error!(t.base, tok, "Unpacking is not supported");
                         
                         ObjectField {
                             name: tok,
@@ -2074,12 +2076,12 @@ impl Transform for Arg<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.keyword.is_some() {
             let tok = t.tok(self.equal.as_ref().unwrap().tok);
-            token_error!(t.base, tok, "Keyword arguments are not supported");
+            error!(t.base, tok, "Keyword arguments are not supported");
         }
 
         if let Some(tok) = self.star_tok {
             let tok = t.tok(tok);
-            token_error!(t.base, tok, "Unpacking is not supported");
+            error!(t.base, tok, "Unpacking is not supported");
         }
 
         self.value.to_ast(t)
@@ -2106,7 +2108,7 @@ impl Transform for Lambda<'_, '_> {
         let lambda_tok = t.tok(self.lambda_tok);
 
         if t.base.depth != 0 {
-            token_warning!(lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
+            warning(&lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
         }
 
         t.base.inc_depth();
@@ -2155,7 +2157,7 @@ impl Transform for libcst_native::deflated::String<'_, '_> {
             Self::Concatenated(x) => x.to_ast(t),
             Self::Formatted(_) => {
                 let tok = t.tok_from_last_pos();
-                token_error!(t.base, tok, "Formatted strings are not supported");
+                error!(t.base, tok, "Formatted strings are not supported");
                 make_null()
             }
         }

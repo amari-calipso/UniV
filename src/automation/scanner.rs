@@ -1,8 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
+use alanglib::{ast::SourcePos, report::error_pos, scanner::{is_alpha, is_alphanumeric, is_beginning_digit, is_bin_digit, is_digit, is_hex_digit, is_oct_digit, substring}};
 use lazy_static::lazy_static;
-
-use crate::utils::{lang::{error, is_alpha, is_alphanumeric, is_beginning_digit, is_bin_digit, is_digit, is_hex_digit, is_oct_digit}, substring};
 
 use super::tokens::{Token, TokenType};
 
@@ -102,11 +101,14 @@ impl Scanner {
     }
 
     fn error(&mut self, msg: &str) {
-        self.errors.push(error(
-            &self.source, msg,
-            &self.filename,
-            self.start.saturating_sub(self.start_positions[self.line]),
-            self.curr.saturating_sub(self.start), self.line
+        self.errors.push(error_pos(
+            &SourcePos::new(
+                Rc::clone(&self.source),
+                Rc::clone(&self.filename),
+                self.start.saturating_sub(self.start_positions[self.line]),
+                self.curr.saturating_sub(self.start), self.line
+            ),
+            msg
         ));
     }
 

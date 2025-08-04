@@ -1,8 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
+use alanglib::ast::{SourcePos, WithPosition};
 use analyzer::Analyzer;
 
-use crate::{unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}, utils::lang::AstPos};
+use crate::{unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}};
 
 pub mod analyzer;
 pub mod environment;
@@ -79,7 +80,7 @@ impl Compiler {
 
     fn push_instruction_tok(&mut self, instruction: Instruction, token: &Token) {
         self.output.instructions.push(instruction);
-        self.output.positions.push(AstPos::new(
+        self.output.positions.push(SourcePos::new(
             Rc::clone(&token.source), 
             Rc::clone(&token.filename), 
             token.pos, 

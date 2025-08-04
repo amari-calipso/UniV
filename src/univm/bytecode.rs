@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::utils::lang::AstPos;
+use alanglib::ast::SourcePos;
 
 use super::object::UniLValue;
 
@@ -136,7 +136,7 @@ impl Display for Instruction {
 pub struct Bytecode {
     pub instructions: Vec<Instruction>,
     pub constants:    Vec<UniLValue>,
-    pub positions:    Vec<AstPos>,
+    pub positions:    Vec<SourcePos>,
     pub names:        Vec<Rc<str>>,
 }
 
@@ -287,7 +287,7 @@ impl<C> bincode::Decode<C> for Bytecode {
                 return Err(DecodeError::Other("Malformed bytecode"));
             }
 
-            positions.push(AstPos {
+            positions.push(SourcePos {
                 source: Rc::from(""),
                 filename: Rc::clone(last_file.as_ref().unwrap()),
                 start, end, line,

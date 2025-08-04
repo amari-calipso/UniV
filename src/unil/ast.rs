@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use crate::{unil::tokens::Token, utils::lang::AstPos};
+use alanglib::ast::{SourcePos, WithPosition};
+
+use crate::unil::tokens::Token;
 
 const INDENT_SIZE: usize = 4;
 
@@ -168,133 +170,6 @@ impl Expression {
             Expression::Variable { .. } | Expression::Get {..} | Expression::Subscript { .. } => true,
             Expression::Grouping { inner } => inner.is_valid_assignment_target(),
             _ => false
-        }
-    }
-
-    pub fn get_pos(&self) -> AstPos {
-        match self {
-            Expression::Grouping { inner } => inner.get_pos(),
-            Expression::Literal { tok, .. } | Expression::Variable{ name: tok, ..} => {
-                AstPos::new(Rc::clone(&tok.source), Rc::clone(&tok.filename), tok.pos, tok.end, tok.line)
-            }
-            Expression::Binary { left,  right, .. } |
-            Expression::Logic { left, right, .. } |
-            Expression::Cmp { left,  right, .. } => {
-                let left_pos = left.get_pos();
-                let right_pos = right.get_pos();
-
-                if left_pos.line != right_pos.line || left_pos.filename != right_pos.filename {
-                    left_pos
-                } else {
-                    AstPos::new(Rc::clone(&left_pos.source), Rc::clone(&left_pos.filename), left_pos.start, right_pos.end, left_pos.line)
-                }
-            }
-            Expression::Unary { op, expr, is_prefix, .. } => {
-                let expr_pos = expr.get_pos();
-
-                if *is_prefix {
-                    if op.line != expr_pos.line || op.filename != expr_pos.filename {
-                        AstPos::new(Rc::clone(&op.source), Rc::clone(&op.filename), op.pos, op.end, op.line)
-                    } else {
-                        AstPos::new(Rc::clone(&op.source), Rc::clone(&op.filename), op.pos, expr.get_pos().end, op.line)
-                    }
-                } else {
-                    if expr_pos.line != op.line || op.filename != expr_pos.filename {
-                        expr_pos
-                    } else {
-                        AstPos::new(Rc::clone(&expr_pos.source), Rc::clone(&expr_pos.filename), expr_pos.start, op.end, expr_pos.line)
-                    }
-                }
-            }
-            Expression::Assign { target, value, .. } => {
-                let target_pos = target.get_pos();
-                let value_pos = value.get_pos();
-
-                if target_pos.line != value_pos.line || target_pos.filename != value_pos.filename {
-                    AstPos::new(Rc::clone(&target_pos.source), Rc::clone(&target_pos.filename), target_pos.start, target_pos.end, target_pos.line)
-                } else {
-                    AstPos::new(Rc::clone(&target_pos.source), Rc::clone(&target_pos.filename), target_pos.start, value_pos.end, target_pos.line)
-                }
-            }
-            Expression::Call { callee, paren, .. } => {
-                let callee_pos = callee.get_pos();
-
-                if callee_pos.line != paren.line || callee_pos.filename != paren.filename {
-                    callee_pos
-                } else {
-                    AstPos::new(Rc::clone(&callee_pos.source), Rc::clone(&callee_pos.filename), callee_pos.start, paren.end, callee_pos.line)
-                }
-            }
-            Expression::Ternary { condition: cond, else_expr: else_, .. } => {
-                let cond_pos = cond.get_pos();
-                let else_pos = else_.get_pos();
-
-                if cond_pos.line != else_pos.line || cond_pos.filename != else_pos.filename {
-                    cond_pos
-                } else {
-                    AstPos::new(Rc::clone(&cond_pos.source), Rc::clone(&cond_pos.filename), cond_pos.start, else_pos.end, cond_pos.line)
-                }
-            }
-            Expression::Subscript { subscripted, paren, .. } => {
-                let subscripted_pos = subscripted.get_pos();
-
-                if subscripted_pos.line != paren.line || subscripted_pos.filename != paren.filename {
-                    subscripted_pos
-                } else {
-                    AstPos::new(Rc::clone(&subscripted_pos.source), Rc::clone(&subscripted_pos.filename), subscripted_pos.start, paren.end, subscripted_pos.line)
-                }
-            }
-            Expression::Get { object, name, .. } => {
-                let object_pos = object.get_pos();
-
-                if object_pos.line != name.line || object_pos.filename != name.filename {
-                    AstPos::new(Rc::clone(&name.source), Rc::clone(&name.filename), name.pos, name.end, name.line)
-                } else {
-                    AstPos::new(Rc::clone(&object_pos.source), Rc::clone(&object_pos.filename), object_pos.start, name.end, object_pos.line)
-                }
-            },
-            Expression::List { opening_brace: open_paren, items: exprs, .. } => {
-                match exprs.len() {
-                    0 => {
-                        AstPos::new(
-                            Rc::clone(&open_paren.source),
-                            Rc::clone(&open_paren.filename),
-                            open_paren.pos,
-                            open_paren.end,
-                            open_paren.line
-                        )
-                    }
-                    1 => exprs[0].get_pos(),
-                    _ => {
-                        let first_pos = exprs[0].get_pos();
-                        let last_pos = exprs.last().unwrap().get_pos();
-
-                        if first_pos.line != last_pos.line || first_pos.filename != last_pos.filename {
-                            first_pos
-                        } else {
-                            AstPos::new(Rc::clone(&first_pos.source), Rc::clone(&first_pos.filename), first_pos.start, last_pos.end, first_pos.line)
-                        }
-                    }
-                }
-            }
-            Expression::Block { opening_brace: tok, .. } |
-            Expression::ScopedBlock { dollar: tok, .. } |
-            Expression::If { kw: tok, .. } |
-            Expression::While { kw: tok, .. } |
-            Expression::DoWhile { kw: tok, .. } |
-            Expression::Function { name: tok, .. } |
-            Expression::Return { kw: tok, .. } |
-            Expression::Switch { kw: tok, .. } |
-            Expression::Break { kw: tok, .. } |
-            Expression::Continue { kw: tok, .. } |
-            Expression::Foreach { kw: tok, .. } |
-            Expression::AnonObject { kw: tok, .. } |
-            Expression::Throw { kw: tok, .. } |
-            Expression::Drop { kw: tok, .. } |
-            Expression::Try { kw: tok, .. } |
-            Expression::AlgoDecl { name: tok, .. } => {
-                AstPos::new(Rc::clone(&tok.source), Rc::clone(&tok.filename), tok.pos, tok.end, tok.line)
-            }
         }
     }
 
@@ -710,6 +585,135 @@ impl Expression {
                 }
             }
             _ => false // TODO improve recognition
+        }
+    }
+}
+
+impl WithPosition for Expression {
+    fn get_pos(&self) -> SourcePos {
+        match self {
+            Expression::Grouping { inner } => inner.get_pos(),
+            Expression::Literal { tok, .. } | Expression::Variable{ name: tok, ..} => {
+                SourcePos::new(Rc::clone(&tok.source), Rc::clone(&tok.filename), tok.pos, tok.end, tok.line)
+            }
+            Expression::Binary { left,  right, .. } |
+            Expression::Logic { left, right, .. } |
+            Expression::Cmp { left,  right, .. } => {
+                let left_pos = left.get_pos();
+                let right_pos = right.get_pos();
+
+                if left_pos.line != right_pos.line || left_pos.filename != right_pos.filename {
+                    left_pos
+                } else {
+                    SourcePos::new(Rc::clone(&left_pos.source), Rc::clone(&left_pos.filename), left_pos.start, right_pos.end, left_pos.line)
+                }
+            }
+            Expression::Unary { op, expr, is_prefix, .. } => {
+                let expr_pos = expr.get_pos();
+
+                if *is_prefix {
+                    if op.line != expr_pos.line || op.filename != expr_pos.filename {
+                        SourcePos::new(Rc::clone(&op.source), Rc::clone(&op.filename), op.pos, op.end, op.line)
+                    } else {
+                        SourcePos::new(Rc::clone(&op.source), Rc::clone(&op.filename), op.pos, expr.get_pos().end, op.line)
+                    }
+                } else {
+                    if expr_pos.line != op.line || op.filename != expr_pos.filename {
+                        expr_pos
+                    } else {
+                        SourcePos::new(Rc::clone(&expr_pos.source), Rc::clone(&expr_pos.filename), expr_pos.start, op.end, expr_pos.line)
+                    }
+                }
+            }
+            Expression::Assign { target, value, .. } => {
+                let target_pos = target.get_pos();
+                let value_pos = value.get_pos();
+
+                if target_pos.line != value_pos.line || target_pos.filename != value_pos.filename {
+                    SourcePos::new(Rc::clone(&target_pos.source), Rc::clone(&target_pos.filename), target_pos.start, target_pos.end, target_pos.line)
+                } else {
+                    SourcePos::new(Rc::clone(&target_pos.source), Rc::clone(&target_pos.filename), target_pos.start, value_pos.end, target_pos.line)
+                }
+            }
+            Expression::Call { callee, paren, .. } => {
+                let callee_pos = callee.get_pos();
+
+                if callee_pos.line != paren.line || callee_pos.filename != paren.filename {
+                    callee_pos
+                } else {
+                    SourcePos::new(Rc::clone(&callee_pos.source), Rc::clone(&callee_pos.filename), callee_pos.start, paren.end, callee_pos.line)
+                }
+            }
+            Expression::Ternary { condition: cond, else_expr: else_, .. } => {
+                let cond_pos = cond.get_pos();
+                let else_pos = else_.get_pos();
+
+                if cond_pos.line != else_pos.line || cond_pos.filename != else_pos.filename {
+                    cond_pos
+                } else {
+                    SourcePos::new(Rc::clone(&cond_pos.source), Rc::clone(&cond_pos.filename), cond_pos.start, else_pos.end, cond_pos.line)
+                }
+            }
+            Expression::Subscript { subscripted, paren, .. } => {
+                let subscripted_pos = subscripted.get_pos();
+
+                if subscripted_pos.line != paren.line || subscripted_pos.filename != paren.filename {
+                    subscripted_pos
+                } else {
+                    SourcePos::new(Rc::clone(&subscripted_pos.source), Rc::clone(&subscripted_pos.filename), subscripted_pos.start, paren.end, subscripted_pos.line)
+                }
+            }
+            Expression::Get { object, name, .. } => {
+                let object_pos = object.get_pos();
+
+                if object_pos.line != name.line || object_pos.filename != name.filename {
+                    SourcePos::new(Rc::clone(&name.source), Rc::clone(&name.filename), name.pos, name.end, name.line)
+                } else {
+                    SourcePos::new(Rc::clone(&object_pos.source), Rc::clone(&object_pos.filename), object_pos.start, name.end, object_pos.line)
+                }
+            },
+            Expression::List { opening_brace: open_paren, items: exprs, .. } => {
+                match exprs.len() {
+                    0 => {
+                        SourcePos::new(
+                            Rc::clone(&open_paren.source),
+                            Rc::clone(&open_paren.filename),
+                            open_paren.pos,
+                            open_paren.end,
+                            open_paren.line
+                        )
+                    }
+                    1 => exprs[0].get_pos(),
+                    _ => {
+                        let first_pos = exprs[0].get_pos();
+                        let last_pos = exprs.last().unwrap().get_pos();
+
+                        if first_pos.line != last_pos.line || first_pos.filename != last_pos.filename {
+                            first_pos
+                        } else {
+                            SourcePos::new(Rc::clone(&first_pos.source), Rc::clone(&first_pos.filename), first_pos.start, last_pos.end, first_pos.line)
+                        }
+                    }
+                }
+            }
+            Expression::Block { opening_brace: tok, .. } |
+            Expression::ScopedBlock { dollar: tok, .. } |
+            Expression::If { kw: tok, .. } |
+            Expression::While { kw: tok, .. } |
+            Expression::DoWhile { kw: tok, .. } |
+            Expression::Function { name: tok, .. } |
+            Expression::Return { kw: tok, .. } |
+            Expression::Switch { kw: tok, .. } |
+            Expression::Break { kw: tok, .. } |
+            Expression::Continue { kw: tok, .. } |
+            Expression::Foreach { kw: tok, .. } |
+            Expression::AnonObject { kw: tok, .. } |
+            Expression::Throw { kw: tok, .. } |
+            Expression::Drop { kw: tok, .. } |
+            Expression::Try { kw: tok, .. } |
+            Expression::AlgoDecl { name: tok, .. } => {
+                SourcePos::new(Rc::clone(&tok.source), Rc::clone(&tok.filename), tok.pos, tok.end, tok.line)
+            }
         }
     }
 }

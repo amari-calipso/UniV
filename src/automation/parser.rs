@@ -1,4 +1,4 @@
-use crate::token_error;
+use crate::error;
 
 use super::{ast::{Expression, RunAllSortsCategory, Statement}, tokens::{Token, TokenType}};
 
@@ -72,7 +72,7 @@ impl Parser {
             Some(self.advance())
         } else {
             let tok = self.peek();
-            token_error!(self, tok, msg);
+            error!(self, tok, msg);
             None
         }
     }
@@ -95,7 +95,7 @@ impl Parser {
         }
 
         let last = self.peek();
-        token_error!(self, last, "Expecting expression");
+        error!(self, last, "Expecting expression");
         None
     }
 
@@ -160,21 +160,21 @@ impl Parser {
                 if self.match_(&[TokenType::Length]) {
                     if length.is_some() {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify length multiple times");
+                        error!(self, tok, "Cannot specify length multiple times");
                     }
 
                     length = Some(self.expression()?);
                 } else if self.match_(&[TokenType::Timestamp]) {
                     if timestamp {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify timestamp multiple times");
+                        error!(self, tok, "Cannot specify timestamp multiple times");
                     }
 
                     timestamp = true;
                 } else {
                     if unique.is_some() {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify unique amount multiple times");
+                        error!(self, tok, "Cannot specify unique amount multiple times");
                     }
 
                     unique = Some(self.expression()?);
@@ -212,14 +212,14 @@ impl Parser {
                 if self.match_(&[TokenType::Length]) {
                     if length.is_some() {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify length multiple times");
+                        error!(self, tok, "Cannot specify length multiple times");
                     }
 
                     length = Some(self.expression()?);
                 } else if self.match_(&[TokenType::Speed]) {
                     if speed.is_some() {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify speed multiple times");
+                        error!(self, tok, "Cannot specify speed multiple times");
                     }
 
                     speed = Some(self.expression()?);
@@ -233,7 +233,7 @@ impl Parser {
 
                     if max_length.is_some() {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify max length multiple times");
+                        error!(self, tok, "Cannot specify max length multiple times");
                     }
 
                     self.consume(TokenType::Length, format!("Expecting 'length' after '{}'", kw.lexeme.to_lowercase()).as_str())?;
@@ -241,13 +241,13 @@ impl Parser {
                 } else if self.match_(&[TokenType::Timestamp]) {
                     if timestamp {
                         let tok = self.previous();
-                        token_error!(self, tok, "Cannot specify timestamp multiple times");
+                        error!(self, tok, "Cannot specify timestamp multiple times");
                     }
 
                     timestamp = true;
                 } else {
                     let tok = self.previous();
-                    token_error!(self, tok, "Expecting 'length', 'speed', 'scaled by', 'max length' or 'timestamp' as item of with clause");
+                    error!(self, tok, "Expecting 'length', 'speed', 'scaled by', 'max length' or 'timestamp' as item of with clause");
                 }
 
                 if !self.match_(&[TokenType::And]) {
@@ -313,13 +313,13 @@ impl Parser {
                 return self.run_all_shuffles();
             } else {
                 let last = self.peek();
-                token_error!(self, last, "Expecting 'sorts' or 'shuffles' after 'run all'");
+                error!(self, last, "Expecting 'sorts' or 'shuffles' after 'run all'");
                 return None;
             }
         }
 
         let last = self.peek();
-        token_error!(self, last, "Expecting run statement");
+        error!(self, last, "Expecting run statement");
         None
     }
 
@@ -368,7 +368,7 @@ impl Parser {
         }
 
         let last = self.peek();
-        token_error!(self, last, "Expecting statement");
+        error!(self, last, "Expecting statement");
         None
     }
 

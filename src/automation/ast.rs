@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::utils::lang::AstPos;
+use alanglib::ast::{SourcePos, WithPosition};
 
 use super::tokens::Token;
 
@@ -39,14 +39,14 @@ pub enum Expression {
     String(Token)
 }
 
-impl Expression {
-    pub fn get_pos(&self) -> AstPos {
+impl WithPosition for Expression {
+    fn get_pos(&self) -> SourcePos {
         match self {
             Expression::Identifier(token) |
             Expression::Float(token) |
             Expression::Int(token) |
             Expression::String(token) => {
-                AstPos::new(
+                SourcePos::new(
                     Rc::clone(&token.source), 
                     Rc::clone(&token.filename), 
                     token.pos, token.end, token.line

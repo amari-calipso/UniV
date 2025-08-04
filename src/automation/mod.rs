@@ -1,11 +1,12 @@
 use std::{collections::HashMap, fs::File, io::{Error, Write}, rc::Rc, time::Duration};
 
+use alanglib::ast::{SourcePos, WithPosition};
 use ast::{Expression, Statement};
 use parser::Parser;
 use scanner::Scanner;
 use tokens::{Token, TokenType};
 
-use crate::{univm::object::{ExecutionInterrupt, UniLValue}, utils::{duration_to_hms, lang::{traceback_part, AstPos}, object::{expect_int, expect_number, expect_string}}, UniV};
+use crate::{univm::object::{ExecutionInterrupt, UniLValue}, utils::{duration_to_hms, lang::traceback_part, object::{expect_int, expect_number, expect_string}}, UniV};
 
 mod scanner;
 mod tokens;
@@ -77,7 +78,7 @@ impl AutomationInterpreter {
         }
     }
 
-    pub fn create_exception_ast(&mut self, message: Rc<str>, pos: AstPos) -> ExecutionInterrupt {
+    pub fn create_exception_ast(&mut self, message: Rc<str>, pos: SourcePos) -> ExecutionInterrupt {
         ExecutionInterrupt::Exception { 
             value: UniLValue::String(message), 
             traceback: traceback_part(&pos.source, &pos.filename, pos.start, pos.end - pos.start, pos.line), 

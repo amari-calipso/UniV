@@ -120,10 +120,6 @@ macro_rules! expect_traceback {
     };
 }
 
-pub fn substring(string: &str, a: usize, b: usize) -> String {
-    string.chars().skip(a).take(b - a).collect()
-}
-
 pub fn translate(value: f64, min: f64, max: f64, min_result: f64, max_result: f64) -> f64 {
     let delta_orig = max - min;
     let delta_out  = max_result - min_result;

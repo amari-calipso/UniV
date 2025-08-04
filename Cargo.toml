@@ -1,6 +1,6 @@
 [package]
 name = "univ"
-version = "2025.8.2"
+version = "2025.8.4"
 edition = "2024"
 
 [profile.dev]
@@ -13,8 +13,8 @@ lto = true
 default = ["full"]
 # versions
 full = ["language_layers", "ffmpeg"]
-lite = ["ffmpeg", "dep:bincode"]
-dev = ["language_layers", "dep:bincode"]
+lite = ["ffmpeg", "dep:bincode", "alanglib/sourcepos_bin_decode"]
+dev = ["language_layers", "dep:bincode", "alanglib/sourcepos_bin_encode"]
 # internal
 language_layers = ["dep:libcst", "dep:tree-sitter", "dep:tree-sitter-java"]
 ffmpeg = ["dep:flate2", "dep:reqwest"]
@@ -48,6 +48,7 @@ flate2 = { version = "1.1.2", optional = true }
 reblessive = "0.4.1"
 num-format = "0.4.4"
 ordered-float = "5.0.0"
+alanglib = { git = "https://github.com/amari-calipso/alanglib.git", features = ["report_buf"] }
 
 # parsers
 libcst = { git = "https://github.com/amari-calipso/LibCST.git", version = "1.7.0", default-features = false, optional = true }

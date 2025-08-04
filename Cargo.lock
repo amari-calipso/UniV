@@ -27,6 +27,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "alanglib"
+version = "2025.8.4"
+source = "git+https://github.com/amari-calipso/alanglib.git#3dc6e184e5c786962f9f8a975737c707776eeacd"
+dependencies = [
+ "bincode",
+]
+
+[[package]]
 name = "aligned-vec"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2616,8 +2624,9 @@ checksum = "4a1a07cc7db3810833284e8d372ccdc6da29741639ecc70c9ec107df0fa6154c"
 
 [[package]]
 name = "univ"
-version = "2025.8.2"
+version = "2025.8.4"
 dependencies = [
+ "alanglib",
  "bincode",
  "convert_case",
  "enum_dispatch",

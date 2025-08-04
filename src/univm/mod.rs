@@ -1,12 +1,13 @@
 use std::{cell::{OnceCell, RefCell}, collections::{HashMap, HashSet}, rc::Rc};
 
+use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
 use environment::Environment;
 use object::{AnonObject, AnyCallable, AnyObject, Callable, ExecutionInterrupt, Function, List, NativeCallable, UniLValue};
 use raylib::ffi::TraceLogLevel;
 use serde::Serializer;
 
-use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, get_expect, highlights::HighlightInfo, log, utils::{lang::{traceback_part, AstPos}, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
+use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, get_expect, highlights::HighlightInfo, log, utils::{lang::traceback_part, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
 
 pub mod object;
 pub mod environment;
@@ -161,7 +162,7 @@ pub struct Task {
     pub call_stack: Vec<u64>,
     pub exception_handlers_stack: Vec<ExceptionHandler>,
     pub exception: Option<UniLValue>,
-    pub pos_stack: Vec<AstPos>,
+    pub pos_stack: Vec<SourcePos>,
 
     pub running: bool,
     pub started: bool
