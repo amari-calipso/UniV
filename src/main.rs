@@ -27,9 +27,7 @@ use highlights::HighlightInfo;
 use value::{Value, VerifyValue};
 use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
-
-#[cfg(feature = "dev")]
-use bincode::encode_into_std_write;
+use utils::report_errors;
 
 #[cfg(feature = "lite")]
 use bincode::decode_from_slice;
@@ -107,6 +105,9 @@ mod ffmpeg;
 
 #[cfg(not(feature = "lite"))]
 mod language_layers;
+
+#[cfg(feature = "dev")]
+mod dev;
 
 enum ArrayState {
     Unsorted,
@@ -2199,7 +2200,7 @@ impl UniV {
     }
 
     #[cfg(not(feature = "lite"))]
-    fn compile_algos(&mut self, errors: &mut Vec<Error>) -> Option<Bytecode> {
+    fn get_algos_ast(&mut self, errors: &mut Vec<Error>) -> Vec<Expression> {
         log!(TraceLogLevel::LOG_INFO, "Loading algorithms");
 
         let mut toplevel_ast = {
@@ -2218,7 +2219,13 @@ impl UniV {
                 Err(e) => errors.extend(e),
             }
         }
-        
+
+        toplevel_ast
+    }
+
+    #[cfg(not(feature = "lite"))]
+    fn compile_algos(&mut self, errors: &mut Vec<Error>) -> Option<Bytecode> {
+        let mut toplevel_ast = self.get_algos_ast(errors);
         unil::swap_recognition::process(&mut toplevel_ast);
 
         match compiler::compile(&toplevel_ast, &self.vm.globals.borrow()) {
@@ -2491,15 +2498,7 @@ impl UniV {
                 }
             }
             Err(errors) => {
-                let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-                for error in errors {
-                    error_buf.push('\n');
-                    error_buf.push_str(&error.to_string());
-                }
-
-                log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-
+                let error_buf = report_errors("Something went wrong while loading algorithms", &errors);
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", &error_buf).unwrap();
                 if self.run_gui().is_err() {
@@ -2532,15 +2531,7 @@ impl UniV {
                 }
             }
             Err(errors) => {
-                let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-                for error in errors {
-                    error_buf.push('\n');
-                    error_buf.push_str(&error.to_string());
-                }
-
-                log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-
+                let error_buf = report_errors("Something went wrong while loading algorithms", &errors);
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", &error_buf).unwrap();
                 self.run_gui()?;
@@ -3517,33 +3508,6 @@ impl Drop for UniV {
     }
 }
 
-#[cfg(feature = "dev")]
-fn compile_algos() -> Result<(), Error> {
-    let mut errors = Vec::new();
-    let bytecode = UniV::new().compile_algos(&mut errors);
-
-    if errors.is_empty() {
-        log!(TraceLogLevel::LOG_INFO, "Serializing bytecode");
-
-        let mut f = File::create("algos.unib")?;
-        encode_into_std_write(bytecode.unwrap(), &mut f, bincode::config::standard())
-            .map_err(|e| Error::other(e.to_string()))?;
-
-        log!(TraceLogLevel::LOG_INFO, "Compilation was successful");
-        Ok(())
-    } else {
-        let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-        for error in errors {
-            error_buf.push('\n');
-            error_buf.push_str(&error.to_string());
-        }
-
-        log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-        Err(Error::other("Compilation failed"))
-    }
-}
-
 fn main() -> Result<(), Error> {
     let args_map: HashMap<String, usize> = env::args().enumerate().map(|(i, x)| (x, i)).collect();
 
@@ -3574,19 +3538,27 @@ fn main() -> Result<(), Error> {
     }).expect("Program directory OnceCell was already set");
 
     #[cfg(feature = "dev")]
-    if args_map.contains_key("--compile-algos") {
-        return compile_algos();
+    {
+        if args_map.contains_key("--compile-algos") {
+            return dev::compile_algos();
+        }
+
+        if args_map.contains_key("--generate-headers") {
+            return dev::generate_headers();
+        }
     }
 
-    // avoids raylib unloading messages flood when the program panics
-    let default_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |info| {
-        unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_NONE as i32) };
-        default_hook(info);
-    }));
-
     #[cfg(not(feature = "dev"))] 
-    UniV::new().init_run();
+    {
+        // avoids raylib unloading messages flood when the program panics
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_NONE as i32) };
+            default_hook(info);
+        }));
+
+        UniV::new().init_run();
+    }
 
     Ok(())
 }

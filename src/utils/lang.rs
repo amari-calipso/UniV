@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use crate::unil::{ast::{Expression, LiteralKind}, scanner::KEYWORDS, tokens::Token};
 
+const INDENT_SIZE: usize = 4;
+
 #[cfg(not(feature = "lite"))]
 pub trait Transform {
     type Transformer;
@@ -108,5 +110,12 @@ pub fn get_vec_of_expr_from_block(expr: Expression) -> Vec<Expression> {
         expressions
     } else {
         panic!("Expression was not Block")
+    }
+}
+
+#[allow(dead_code)]
+pub fn push_indent(str: &mut String, level: usize) {
+    for _ in 0 .. level * INDENT_SIZE {
+        str.push(' ');
     }
 }

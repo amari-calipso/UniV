@@ -2184,10 +2184,137 @@ impl Transform for libcst_native::deflated::NamedExpr<'_, '_> {
     }
 }
 
+#[cfg(feature = "dev")]
+mod headers {
+    use std::{collections::HashMap, rc::Rc};
+
+    use crate::{compiler::type_system::UniLType, utils::lang::push_indent};
+
+    fn stringify_type(type_: &UniLType) -> String {
+        match type_ {
+            UniLType::Type(inner) => stringify_type(&inner),
+            UniLType::Any | UniLType::Object { .. } => String::from("object"),
+            UniLType::Null => String::from("None"),
+            UniLType::Int => String::from("int"),
+            UniLType::Float => String::from("float"),
+            UniLType::Value => String::from("Value"),
+            UniLType::String => String::from("str"),
+            UniLType::List => String::from("list"),
+            UniLType::Callable { args, return_type } => {
+                let mut buf = String::from("Callable[[");
+
+                for (i, param) in args.iter().enumerate() {
+                    buf.push_str(&stringify_type(param));
+
+                    if i + 1 != args.len() {
+                        buf.push_str(", ")
+                    }
+                }
+
+                buf.push_str("], ");
+                buf.push_str(&stringify_type(&return_type));
+                buf.push(']');
+                buf
+            }
+            UniLType::Group(types) => {
+                let mut buf = String::new();
+
+                for (i, type_) in types.iter().enumerate() {
+                    buf.push_str(&stringify_type(type_));
+
+                    if i + 1 != types.len() {
+                        buf.push_str(" | ")
+                    }
+                }
+
+                buf
+            }
+        }
+    }
+
+    pub fn make(globals: &HashMap<Rc<str>, UniLType>, buf: &mut String, indent: usize) {
+        for (name, type_) in globals {
+            match type_ {
+                UniLType::Type(inner) => {
+                    if matches!(&**inner, UniLType::Null) {
+                        continue;
+                    }
+
+                    let stringified = stringify_type(inner);
+
+                    if name.as_ref() == stringified.as_str() {
+                        continue;
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str(name);
+                    buf.push_str(" = ");
+                    buf.push_str(&stringified);
+                    buf.push('\n');
+                }
+                UniLType::Object { fields } => {
+                    push_indent(buf, indent);
+                    buf.push_str("@dataclass\n");
+                    push_indent(buf, indent);
+                    buf.push_str("class ");
+                    buf.push_str(name);
+                    buf.push_str(":\n");
+                    make(&fields.borrow(), buf, indent + 1);
+                }
+                UniLType::Callable { args, return_type } => {
+                    match name.as_ref() {
+                        "str" | "int" | "float" => continue,
+                        _ => ()
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str("def ");
+                    buf.push_str(name);
+                    buf.push('(');
+
+                    for (i, arg) in args.iter().enumerate() {
+                        buf.push_str("arg");
+                        buf.push_str(&i.to_string());
+                        buf.push_str(": ");
+                        buf.push_str(&stringify_type(arg));
+
+                        if i + 1 != args.len() {
+                            buf.push_str(", ")
+                        }
+                    }
+
+                    buf.push_str(") -> ");
+                    buf.push_str(&stringify_type(return_type));
+                    buf.push_str(": ...\n");
+                }
+                _ => {
+                    match name.as_ref() {
+                        "True" | "False" | "None" | "__name__" => continue,
+                        _ => ()
+                    }
+
+                    let stringified = stringify_type(type_);
+
+                    if name.as_ref() == stringified.as_str() {
+                        continue;
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str(name);
+                    buf.push_str(": ");
+                    buf.push_str(&stringified);
+                    buf.push('\n');
+                }
+            }
+        }
+    }
+}
+
 language_layer! {
+    language = python;
     extension = "py";
 
-    python::process(source, filename) {
+    process(source, filename) {
         use crate::language_layers::python;
         use crate::utils::lang::Transform;
         use crate::unil::ast::Expression;
@@ -2225,5 +2352,11 @@ language_layer! {
         } else {
             unreachable!()
         }
+    }
+
+    generate_headers(globals) {
+        let mut declarations = String::from("from typing import Callable\nfrom dataclasses import dataclass\nclass Value: ...\n");
+        headers::make(globals, &mut declarations, 0);
+        declarations
     }
 }

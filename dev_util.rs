@@ -40,6 +40,29 @@ fn get_filename(target: &Option<String>) -> &str {
     }
 }
 
+fn generate_headers() -> Result<(), Error> {
+    println!("Generating headers for third-party languages");
+
+    let headers = PathBuf::from("headers");
+    if headers.exists() {
+        println!("\"headers\" folder exists. Deleting");
+        fs::remove_dir_all(&headers)?;
+    }
+
+    println!("Creating \"headers\" folder");
+    fs::create_dir(&headers)?;
+
+    let mut command = Command::new("cargo");
+    command.arg("run").arg("--features").arg("dev")
+        .arg("--").arg("--generate-headers");
+
+    if !command.status()?.success() {
+        return Err(Error::other("Compilation failed"));
+    }
+
+    Ok(())
+}
+
 fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: bool) -> Result<(), Error> {
     let target = {
         if let Some(idx) = args_map.get("--target") {
@@ -94,6 +117,8 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     if !lite {
         println!("Copying algorithms to \"dist\" folder");
         clone_dir(&PathBuf::from("algos"), &dist.join("algos"))?;
+        println!("Copying headers to \"dist\" folder");
+        clone_dir(&PathBuf::from("headers"), &dist.join("headers"))?;
     }
     
     println!("Copying automations to \"dist\" folder");
@@ -107,6 +132,11 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     fs::copy(&PathBuf::from("resources").join("FONTLICENSE"), &dist.join("FONTLICENSE"))?;
 
     Ok(())
+}
+
+fn release_full(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>) -> Result<(), Error> {
+    generate_headers()?;
+    release(args, args_map, false)
 }
 
 fn compile_algos() -> Result<(), Error> {
@@ -161,6 +191,7 @@ fn clean() -> Result<(), Error> {
 
     ok_if_notfound!(fs::remove_file(PathBuf::from("./algos.unib")));
     ok_if_notfound!(fs::remove_dir_all(PathBuf::from("./resources/gen")));
+    ok_if_notfound!(fs::remove_dir_all(PathBuf::from("./headers")));
     Ok(())
 }
 
@@ -193,9 +224,10 @@ fn main() -> Result<(), Error> {
     commands! {
         (args, args_map);
         
-        "--release"      -> release(&mut args, &mut args_map, false)?
+        "--release"      -> release_full(&mut args, &mut args_map)?
         "--release-lite" -> release_lite(&mut args, &mut args_map)?
         "--run-lite"     -> run_lite()?
+        "--gen-headers"  -> generate_headers()?
         "--clean"        -> clean()?
     };
 

@@ -608,6 +608,11 @@ The following Python constructs are not currently supported:
 - Non-string dictionary keys
 #### API support
 Visualizer interaction in the Python layer usually happens using the [oSV API](https://github.com/amari-calipso/sorting-visualizer), but interacting with the [UniV API](#visualizer-interaction) directly also works.
+
+You can get IDE support for the UniV API by importing UniV's headers, though this is not necessary. If your file is in the `algos` folder, adding this line on top of your file is sufficient:
+```py
+from ...headers.UniV import *
+```
 ### Java
 Java support is in the works, stay tuned!
 ## Adding visual styles

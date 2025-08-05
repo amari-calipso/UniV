@@ -20,6 +20,9 @@ algos.unib
 dev_util
 dev_util.exe
 
+# third-party languages headers
+/headers/
+
 # render output
 output.mp4
 tmp.mp4

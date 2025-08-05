@@ -21,7 +21,7 @@ struct CurrFn {
 }
 
 pub struct Analyzer {
-    globals:     Rc<RefCell<AnalyzerEnvironment>>,
+    pub globals: Rc<RefCell<AnalyzerEnvironment>>,
     environment: Rc<RefCell<AnalyzerEnvironment>>,
 
     in_loop: bool,

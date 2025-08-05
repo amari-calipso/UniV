@@ -1,5 +1,7 @@
 use std::time::{Duration, SystemTime};
 
+use raylib::ffi::TraceLogLevel;
+
 pub mod lang;
 pub mod gfx;
 pub mod sound;
@@ -162,4 +164,16 @@ pub fn duration_to_hms(duration: &Duration) -> String {
     }
 
     format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+pub fn report_errors<T: ToString>(msg: &str, errors: &Vec<T>) -> String {
+    let mut error_buf = format!("{}:", msg);
+
+    for error in errors {
+        error_buf.push('\n');
+        error_buf.push_str(&error.to_string());
+    }
+
+    log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
+    error_buf
 }
