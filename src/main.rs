@@ -3560,7 +3560,7 @@ fn main() -> Result<(), Error> {
     #[cfg(feature = "dev")]
     {
         if args_map.contains_key("--compile-algos") {
-            return dev::compile_algos();
+            return dev::compile_algos(args_map.contains_key("--with-headers"));
         }
 
         if args_map.contains_key("--generate-headers") {

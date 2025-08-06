@@ -6,9 +6,9 @@ use bincode::encode_into_std_write;
 
 use crate::{log, UniV, utils::report_errors, compiler::analyzer::Analyzer, utils};
 
-pub fn compile_algos() -> Result<(), Error> {
+pub fn compile_algos(headers: bool) -> Result<(), Error> {
     let mut errors = Vec::new();
-    let bytecode = UniV::new().compile_algos(&mut errors, false);
+    let bytecode = UniV::new().compile_algos(&mut errors, headers);
 
     if errors.is_empty() {
         log!(TraceLogLevel::LOG_INFO, "Serializing bytecode");

@@ -38,14 +38,16 @@ os.mkdir("publish")
 
 prepare_deps()
 
+# lite version is compiled first so algorithm compilation 
+# can also generate headers without the extra step later
 pack(
-    "rustc dev_util.rs -o dev_util && ./dev_util --release",
-    "rustc dev_util.rs -o dev_util.exe && dev_util --release",
-    "UniV"
+    "rustc dev_util.rs -o dev_util && ./dev_util --release-lite --with-headers",
+    "rustc dev_util.rs -o dev_util.exe && dev_util --release-lite --with-headers",
+    "UniV-lite"
 )
 
 pack(
-    "rustc dev_util.rs -o dev_util && ./dev_util --release-lite",
-    "rustc dev_util.rs -o dev_util.exe && dev_util --release-lite",
-    "UniV-lite"
+    "rustc dev_util.rs -o dev_util && ./dev_util --release --no-gen-headers",
+    "rustc dev_util.rs -o dev_util.exe && dev_util --release --no-gen-headers",
+    "UniV"
 )
