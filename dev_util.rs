@@ -43,15 +43,6 @@ fn get_filename(target: &Option<String>) -> &str {
 fn generate_headers() -> Result<(), Error> {
     println!("Generating headers for third-party languages");
 
-    let headers = PathBuf::from("headers");
-    if headers.exists() {
-        println!("\"headers\" folder exists. Deleting");
-        fs::remove_dir_all(&headers)?;
-    }
-
-    println!("Creating \"headers\" folder");
-    fs::create_dir(&headers)?;
-
     let mut command = Command::new("cargo");
     command.arg("run").arg("--features").arg("dev")
         .arg("--").arg("--generate-headers");

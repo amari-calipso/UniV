@@ -8,7 +8,6 @@ macro_rules! lang_hook {
             $body
         }
 
-        #[cfg(feature = "dev")]
         pub fn generate_headers(_globals: &std::collections::HashMap<std::rc::Rc<str>, $crate::compiler::type_system::UniLType>) -> String {
             String::new()
         }
@@ -24,7 +23,6 @@ macro_rules! lang_hook {
             $body
         }
 
-        #[cfg(feature = "dev")]
         pub fn generate_headers($globals: &std::collections::HashMap<std::rc::Rc<str>, $crate::compiler::type_system::UniLType>) -> String {
             $headers
         }
@@ -74,7 +72,6 @@ macro_rules! language_layer {
     };
 }
 
-#[cfg(feature = "dev")]
 #[macro_export]
 macro_rules! __write_header_file {
     ($language: ident, $globals: ident, $folder: literal) => {

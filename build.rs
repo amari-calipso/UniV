@@ -104,8 +104,7 @@ fn generate_language_module(folder: &str, src: &Path, msg: &str) -> Result<(), E
     let mut mods    = String::new();
     let mut load_fn = String::from("pub fn define(layers: &mut std::collections::HashMap<std::rc::Rc<str>, crate::LanguageLayerFn>) {\n");
 
-    let mut generate_headers_fn = String::from("#[cfg(feature = \"dev\")]\n");
-    generate_headers_fn.push_str("pub fn generate_headers(\n");
+    let mut generate_headers_fn = String::from("pub fn generate_headers(\n");
     push_indent(&mut generate_headers_fn, 1);
     generate_headers_fn.push_str("globals: &std::collections::HashMap<std::rc::Rc<str>, crate::compiler::type_system::UniLType>\n");
     generate_headers_fn.push_str(") -> Result<(), std::io::Error> {\n");

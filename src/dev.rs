@@ -4,11 +4,11 @@ use raylib::ffi::TraceLogLevel;
 
 use bincode::encode_into_std_write;
 
-use crate::{log, UniV, utils::report_errors, compiler::analyzer::Analyzer, language_layers};
+use crate::{log, UniV, utils::report_errors, compiler::analyzer::Analyzer, utils};
 
 pub fn compile_algos() -> Result<(), Error> {
     let mut errors = Vec::new();
-    let bytecode = UniV::new().compile_algos(&mut errors);
+    let bytecode = UniV::new().compile_algos(&mut errors, false);
 
     if errors.is_empty() {
         log!(TraceLogLevel::LOG_INFO, "Serializing bytecode");
@@ -41,7 +41,7 @@ pub fn generate_headers() -> Result<(), Error> {
         }
 
         log!(TraceLogLevel::LOG_INFO, "Generating headers");
-        language_layers::generate_headers(analyzer.globals.borrow().get_locals())?;
+        UniV::generate_headers(analyzer.globals.borrow().get_locals())?;
         log!(TraceLogLevel::LOG_INFO, "Generation was successful");
         Ok(())
     } else {

@@ -2184,7 +2184,6 @@ impl Transform for libcst_native::deflated::NamedExpr<'_, '_> {
     }
 }
 
-#[cfg(feature = "dev")]
 mod headers {
     use std::{collections::HashMap, rc::Rc};
 
@@ -2254,8 +2253,6 @@ mod headers {
                 }
                 UniLType::Object { fields } => {
                     push_indent(buf, indent);
-                    buf.push_str("@dataclass\n");
-                    push_indent(buf, indent);
                     buf.push_str("class ");
                     buf.push_str(name);
                     buf.push_str(":\n");
@@ -2273,6 +2270,14 @@ mod headers {
                     buf.push('(');
 
                     for (i, arg) in args.iter().enumerate() {
+                        // if indent is not 0, we are in a class. methods have an extra field that 
+                        // is an artifact of transpilation (every call to a method is translated to object.method(object, args...)).
+                        // but because to the IDEs the methods will look like they're static when you call them, 
+                        // we skip the first one when we're in a class, so the IDE gives proper hints
+                        if indent != 0 && i == 0 {
+                            continue;
+                        }
+
                         buf.push_str("arg");
                         buf.push_str(&i.to_string());
                         buf.push_str(": ");
@@ -2355,7 +2360,31 @@ language_layer! {
     }
 
     generate_headers(globals) {
-        let mut declarations = String::from("from typing import Callable\nfrom dataclasses import dataclass\nclass Value: ...\n");
+        let mut declarations = String::from(r#"from typing import Callable, Tuple
+from enum import IntEnum
+
+class Value:
+    def copy(self) -> "Value": ...
+    def noMark(self) -> "Value": ...
+    def read(self) -> "Value": ...
+    def getInt(self) -> int: ...
+    def readInt(self) -> int: ...
+    def readNoMark(self) -> Tuple["Value", None]: ...
+    def readDigit(self) -> int: ...
+    def swap(self, other: "Value") -> "Value": ...
+    def write(self, other: "Value" | int) -> "Value": ...
+    def writeRestoreIdx(self, other: "Value" | int, idx: None) -> "Value": ...
+
+class RotationMode(IntEnum):
+    INDEXED, LENGTHS = range(2)
+
+def Sort(category: str, name: str, listName: str, killers: str | None = None): ...
+def Shuffle(name: str): ...
+def Distribution(name: str): ...
+def PivotSelection(name: str): ...
+def Rotation(name: str, mode: RotationMode = RotationMode.INDEXED): ...
+
+"#);
         headers::make(globals, &mut declarations, 0);
         declarations
     }

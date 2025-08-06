@@ -1,9 +1,9 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use alanglib::ast::{SourcePos, WithPosition};
 use analyzer::Analyzer;
 
-use crate::{unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}};
+use crate::{compiler::environment::AnalyzerEnvironment, unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}};
 
 pub mod analyzer;
 pub mod environment;
@@ -727,7 +727,7 @@ impl Compiler {
     }
 }
 
-pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<Bytecode, Vec<String>> {
+pub fn compile_and_get_globals(expressions: &Vec<Expression>, globals: &Environment) -> Result<(Bytecode, Rc<RefCell<AnalyzerEnvironment>>), Vec<String>> {
     let mut analyzer = Analyzer::new(globals);
     analyzer.analyze(expressions);
 
@@ -737,5 +737,10 @@ pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<B
 
     let mut compiler = Compiler::new();
     compiler.compile(expressions);
-    Ok(compiler.output)
+    Ok((compiler.output, analyzer.globals))
+}
+
+#[allow(dead_code)]
+pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<Bytecode, Vec<String>> {
+    Ok(compile_and_get_globals(expressions, globals)?.0)
 }

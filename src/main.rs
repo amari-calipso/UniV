@@ -28,6 +28,7 @@ use value::{Value, VerifyValue};
 use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
 use utils::report_errors;
+use compiler::type_system::UniLType;
 
 #[cfg(feature = "lite")]
 use bincode::decode_from_slice;
@@ -2224,12 +2225,31 @@ impl UniV {
     }
 
     #[cfg(not(feature = "lite"))]
-    fn compile_algos(&mut self, errors: &mut Vec<Error>) -> Option<Bytecode> {
+    pub fn generate_headers(globals: &HashMap<Rc<str>, UniLType>) -> Result<(), Error> {
+        let headers = program_dir!().join("headers");
+        if !headers.exists() {
+            fs::create_dir(&headers)?;
+        }
+        
+        language_layers::generate_headers(globals)?;
+        Ok(())
+    }
+
+    #[cfg(not(feature = "lite"))]
+    fn compile_algos(&mut self, errors: &mut Vec<Error>, headers: bool) -> Option<Bytecode> {
         let mut toplevel_ast = self.get_algos_ast(errors);
         unil::swap_recognition::process(&mut toplevel_ast);
 
-        match compiler::compile(&toplevel_ast, &self.vm.globals.borrow()) {
-            Ok(bytecode) => Some(bytecode),
+        match compiler::compile_and_get_globals(&toplevel_ast, &self.vm.globals.borrow()) {
+            Ok((bytecode, globals)) => {
+                if headers {
+                    if let Err(e) = Self::generate_headers(globals.borrow().get_locals()) {
+                        errors.push(e);
+                    }
+                }
+
+                Some(bytecode)
+            }
             Err(err) => {
                 errors.extend(err.into_iter().map(|x| Error::other(x)));
                 None
@@ -2241,7 +2261,7 @@ impl UniV {
         let mut errors = Vec::new();
 
         #[cfg(not(feature = "lite"))]
-        let bytecode = self.compile_algos(&mut errors);
+        let bytecode = self.compile_algos(&mut errors, true);
 
         #[cfg(feature = "lite")]
         let bytecode: Option<Bytecode> = Some(
