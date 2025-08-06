@@ -10,7 +10,7 @@ ARCH = platform.machine()
 
 def prepare_deps():
     if PLATFORM == "Linux":
-        code = os.system("sudo apt install build-essential libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev")
+        code = os.system("sudo apt update && sudo apt install build-essential libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev")
         if code != 0: sys.exit(1)
 
 
