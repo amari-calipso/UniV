@@ -58,6 +58,7 @@ pub struct ASTTransformer {
     last_label: Option<Rc<str>>,
 
     curr_sort_decl: Option<HashMap<Rc<str>, Expression>>,
+    is_curr_sort_bucket: bool,
     ignore_super: bool,
     arrayv: bool,
 }
@@ -72,6 +73,7 @@ impl ASTTransformer {
             last_label: None,
             
             curr_sort_decl: None,
+            is_curr_sort_bucket: false,
             ignore_super: false,
             arrayv: false,
         }
@@ -568,6 +570,7 @@ impl ASTTransformer {
                             todo!();
                         } else if self.arrayv && superclass_name.lexeme.as_ref() == "Sort" {
                             self.curr_sort_decl = Some(HashMap::new());
+                            self.is_curr_sort_bucket = false;
                         }
                     } 
 
@@ -1520,13 +1523,61 @@ impl ASTTransformer {
 
                                 todo!()
                             }
+                            // TODO: replicate these flags as below:
+                            // if (sortInfo.getQuestion() != null) {
+                            //     try {
+                            //         extra = sortInfo.validateAnswer(getCustomInput(sortInfo.getQuestion()));
+                            //     } catch (Exception e) {
+                            //         extra = sortInfo.getDefaultAnswer();
+                            //     }
+                            // } else if (sortInfo.isBucketSort()) {
+                            //     if (sortInfo.isRadixSort()) {
+                            //         try {
+                            //             extra = getCustomInput("Enter the base for this sort:");
+                            //         } catch (Exception e) {
+                            //             extra = 4;
+                            //         }
+                            //     } else if (sortInfo.getRunName().contains("Shatter")) {
+                            //         try {
+                            //             extra = getCustomInput("Enter the size for each partition:");
+                            //         } catch (Exception e) {
+                            //             extra = arrayVisualizer.getCurrentLength() / 16;
+                            //         }
+                            //     } else {
+                            //         try {
+                            //             extra = getCustomInput("How many buckets will this sort use?");
+                            //         } catch (Exception e) {
+                            //             extra = 16;
+                            //         }
+                            //     }
+                            //     if (extra < 2) extra = 2;
+                            // } else {
+                            //     extra = 0;
+                            // }
                             "setQuestion" => {
                                 todo!()
                             }
+                            "setBucketSort" | "setRadixSort" => {
+                                if self.is_curr_sort_bucket {
+                                    return make_null();
+                                }
+
+                                if args.len() != 1 {
+                                    todo!("error")
+                                }
+
+                                if let Expression::Literal { value, kind, .. } = &args[0] {
+                                    if matches!(kind, LiteralKind::Int) && value.as_ref() == "0" {
+                                        return make_null();
+                                    }
+                                }
+
+                                self.is_curr_sort_bucket = true;
+
+                                todo!()
+                            }
                             // ignored:
-                            "setRunAllSortsName" | 
-                            "setBucketSort" | 
-                            "setRadixSort" |
+                            "setRunAllSortsName" |
                             "setUnreasonablySlow" |
                             "setBogoSort" => (),
                             _ => {
