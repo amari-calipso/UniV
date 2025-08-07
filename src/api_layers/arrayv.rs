@@ -6,6 +6,7 @@ use crate::api_layers::osv::{clearMark, markArray};
 api_fn_body! {
     compareValues(args, [UniLType::Any, UniLType::Any, UniLType::Any], univ, task) -> (UniLType::Int) {
         args.remove(0);
+        univ.vm.delegate_call = true;
         expect_callable(
             &univ.vm.get_global("compareValues")?, 
             "Expecting 'compareValues' to be a callable", 
@@ -20,6 +21,7 @@ api_fn_body! {
         args.remove(0);
         args.pop();
         args.pop();
+        univ.vm.delegate_call = true;
         expect_callable(
             &univ.vm.get_global("compareIndexValue")?, 
             "Expecting 'compareIndexValue' to be a callable", 
@@ -34,6 +36,8 @@ api_fn_body! {
         args.remove(0);
         args.pop();
         args.pop();
+        args.pop();
+        univ.vm.delegate_call = true;
         expect_callable(
             &univ.vm.get_global("writeToIndex")?, 
             "Expecting 'writeToIndex' to be a callable", 

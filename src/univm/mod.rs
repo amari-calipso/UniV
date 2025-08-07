@@ -572,7 +572,7 @@ impl UniV {
                             .expect("VM instruction pointer tried to access out of bounds position").clone();
 
                         task.pos_stack.push(position);
-            
+
                         match instruction {
                             Instruction::Null   => task.stack.push(UniLValue::Null),
                             Instruction::One    => task.stack.push(UniLValue::Int(1)),
