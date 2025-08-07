@@ -4,6 +4,7 @@ class CircleSort:
         while a <= b:
             if array[a] > array[b]:
                 array[a].swap(array[b])
+                s = True
 
             a += 1
             b -= 1

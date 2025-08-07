@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{api_layers, ast_error, ast_note, univm::environment::Environment, token_error, unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, utils::object::object_type};
+use alanglib::report::note;
+
+use crate::{api_layers, error, unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::environment::Environment, utils::object::object_type};
 
 use super::{environment::{AnalyzerEnvError, AnalyzerEnvironment}, type_system::UniLType};
 
@@ -19,7 +21,7 @@ struct CurrFn {
 }
 
 pub struct Analyzer {
-    globals:     Rc<RefCell<AnalyzerEnvironment>>,
+    pub globals: Rc<RefCell<AnalyzerEnvironment>>,
     environment: Rc<RefCell<AnalyzerEnvironment>>,
 
     in_loop: bool,
@@ -60,7 +62,7 @@ impl Analyzer {
         if matches!(value, UniLType::Int | UniLType::Float | UniLType::Value | UniLType::Any) {
             value.clone()
         } else {
-            ast_error!(
+            error!(
                 self, expr, 
                 format!("'-' operator cannot be used on type {}", value.stringify()).as_str()
             );
@@ -73,7 +75,7 @@ impl Analyzer {
         if matches!(value, UniLType::Int | UniLType::Value | UniLType::Any) {
             value.clone()
         } else {
-            ast_error!(
+            error!(
                 self, expr, 
                 format!("'~' operator cannot be used on type {}", value.stringify()).as_str()
             );
@@ -113,7 +115,7 @@ impl Analyzer {
             _ => ()
         }
 
-        ast_error!(
+        error!(
             self, expr, 
             format!(
                 "'+' operator cannot be used on types {} and {}", 
@@ -152,10 +154,15 @@ impl Analyzer {
                     return UniLType::String;
                 }
             }
+            UniLType::List => {
+                if matches!(right, UniLType::Int) {
+                    return UniLType::List;
+                }
+            }
             _ => ()
         }
 
-        ast_error!(
+        error!(
             self, expr, 
             format!(
                 "'*' operator cannot be used on types {} and {}", 
@@ -192,7 +199,7 @@ impl Analyzer {
             _ => ()
         }
 
-        ast_error!(
+        error!(
             self, expr, 
             format!(
                 "'{}' operator cannot be used on types {} and {}", 
@@ -220,7 +227,7 @@ impl Analyzer {
             return left.clone();
         }
 
-        ast_error!(
+        error!(
             self, expr, 
             format!(
                 "'{}' operator cannot be used on types {} and {}", 
@@ -250,7 +257,7 @@ impl Analyzer {
             _ => ()
         }
 
-        ast_error!(
+        error!(
             self, expr, 
             format!(
                 "'{}' operator cannot be used on types {} and {}", 
@@ -268,7 +275,7 @@ impl Analyzer {
         } else {
             if env.enclosing.is_none() { // if we're in globals
                 if env.set_global(&name.lexeme, value.clone()).is_err() {
-                    token_error!(
+                    error!(
                         self, name, 
                         format!("Unknown variable '{}'", name.lexeme).as_str()
                     );
@@ -277,13 +284,13 @@ impl Analyzer {
                 if let Err(e) = env.set(&name.lexeme, value.clone()) {
                     match e {
                         AnalyzerEnvError::Unknown => {
-                            token_error!(
+                            error!(
                                 self, name, 
                                 format!("Unknown variable '{}'", name.lexeme).as_str()
                             );
                         }
                         AnalyzerEnvError::Global => {
-                            token_error!(
+                            error!(
                                 self, name, 
                                 format!("Cannot assign to global '{}' from local scope", name.lexeme).as_str()
                             );
@@ -304,7 +311,7 @@ impl Analyzer {
                     if type_.equals(&value) {
                         self.variable_set(name, value.clone(), define);
                     } else {
-                        ast_error!(
+                        error!(
                             self, expr,
                             format!(
                                 "Value type ({}) does not match target type ({})",
@@ -330,10 +337,10 @@ impl Analyzer {
                         match name.lexeme.as_ref() {
                             "copy" | "noMark" | "read" | "getInt" | "readInt" |
                             "readNoMark" | "readDigit" => {
-                                ast_error!(self, expr, "Cannot overwrite API compatibility functions");
+                                error!(self, expr, "Cannot overwrite API compatibility functions");
                             }
                             _ => {
-                                token_error!(
+                                error!(
                                     self, name, 
                                     format!("Unknown property '{}'", name.lexeme).as_str()
                                 );
@@ -346,7 +353,7 @@ impl Analyzer {
                             if type_.equals(&value) {
                                 borrowed.insert(Rc::clone(&name.lexeme), value.clone().finalize());
                             } else {
-                                ast_error!(
+                                error!(
                                     self, expr,
                                     format!(
                                         "Value type ({}) does not match target type ({})",
@@ -359,7 +366,7 @@ impl Analyzer {
                         }
                     }
                     _ => {
-                        ast_error!(
+                        error!(
                             self, expr, 
                             format!("Cannot write properties of type '{}'", from.stringify()).as_str()
                         );
@@ -390,13 +397,13 @@ macro_rules! analyze_many {
                             AnalyzerInterrupt::Throw => (),
                             AnalyzerInterrupt::BreakOrContinue => {
                                 if !$slf.in_loop {
-                                    ast_error!($slf, $expressions[i], "Cannot use break or continue outside of a loop");
+                                    error!($slf, $expressions[i], "Cannot use break or continue outside of a loop");
                                 }
                             }
                             AnalyzerInterrupt::Return(returned) => {
                                 if let Some(curr_fn) = &$slf.curr_fn {
                                     if !curr_fn.return_type.equals(&returned) {
-                                        ast_error!(
+                                        error!(
                                             $slf, $expressions[i], 
                                             format!(
                                                 "Returned type ({}) does not match function return type ({})",
@@ -404,10 +411,10 @@ macro_rules! analyze_many {
                                             ).as_str()
                                         );
 
-                                        ast_note!(curr_fn.definition, "Return type defined here");
+                                        note(&curr_fn.definition, "Return type defined here");
                                     }
                                 } else {
-                                    ast_error!($slf, $expressions[i], "Cannot use return outside of a function");
+                                    error!($slf, $expressions[i], "Cannot use return outside of a function");
                                 }
                             }
                         }
@@ -444,14 +451,14 @@ impl Analyzer {
                     LiteralKind::Null => Ok(UniLType::Null),
                     LiteralKind::Int => {
                         if value.parse::<i64>().is_err() {
-                            ast_error!(self, expr, "Invalid integer literal");
+                            error!(self, expr, "Invalid integer literal");
                         }
 
                         Ok(UniLType::Int)
                     }
                     LiteralKind::Float => {
                         if value.parse::<f64>().is_err() {
-                            ast_error!(self, expr, "Invalid float literal");
+                            error!(self, expr, "Invalid float literal");
                         }
 
                         Ok(UniLType::Float)
@@ -485,7 +492,7 @@ impl Analyzer {
                         TokenType::Minus => Ok(self.op_unary_minus(&inner, expr)),
                         TokenType::Tilde => Ok(self.op_unary_tilde(&inner, expr)),
                         _ => {
-                            token_error!(
+                            error!(
                                 self, op, 
                                 format!(
                                     "Malformed AST: Unary prefix op cannot be {}",
@@ -497,7 +504,7 @@ impl Analyzer {
                         }
                     }
                 } else {
-                    token_error!(
+                    error!(
                         self, op, 
                         format!(
                             "Malformed AST: Unary suffix op cannot be {}",
@@ -524,7 +531,7 @@ impl Analyzer {
                     TokenType::BitwiseXor => self.op_bitwise(&left, &right),
                     TokenType::BitwiseOr  => self.op_bitwise(&left, &right),
                     _ => {
-                        token_error!(
+                        error!(
                             self, op, 
                             format!(
                                 "Malformed AST: Binary op cannot be {}",
@@ -547,7 +554,7 @@ impl Analyzer {
                     TokenType::GreaterEqual => self.op_cmp(&left, &right, expr, ">="),
                     TokenType::EqualEqual | TokenType::BangEqual => UniLType::Int,
                     _ => {
-                        token_error!(
+                        error!(
                             self, op, 
                             format!(
                                 "Malformed AST: Cmp op cannot be {}",
@@ -568,7 +575,7 @@ impl Analyzer {
                 let value = {
                     if let Some(type_spec) = type_spec {
                         if !matches!(op.type_, TokenType::Walrus) {
-                            token_error!(
+                            error!(
                                 self, op,
                                 "Malformed AST: Type specification in assignment can only be used with ':=' operator"
                             );
@@ -581,7 +588,7 @@ impl Analyzer {
                             if inner.equals(&value) {
                                 *inner
                             } else {
-                                ast_error!(
+                                error!(
                                     self, value_expr,
                                     format!(
                                         "Value type ({}) does not match declared type ({})",
@@ -592,7 +599,7 @@ impl Analyzer {
                                 UniLType::Any
                             }
                         } else {
-                            ast_error!(
+                            error!(
                                 self, value_expr,
                                 format!(
                                     "Expecting type as type specifier (got {})",
@@ -629,7 +636,7 @@ impl Analyzer {
                                 self.op_bitwise(&before_value, &value)
                             }
                             _ => {
-                                token_error!(
+                                error!(
                                     self, op, 
                                     format!(
                                         "Malformed AST: Assign op cannot be {}",
@@ -649,7 +656,7 @@ impl Analyzer {
                 if let Some(value) = self.environment.borrow().get(&name.lexeme) {
                     Ok(value)
                 } else {
-                    token_error!(
+                    error!(
                         self, name, 
                         format!("Unknown variable '{}'", name.lexeme).as_str()
                     );
@@ -715,7 +722,7 @@ impl Analyzer {
             }
             Expression::Call { callee: callee_expr, args: args_expr, paren } => {
                 if args_expr.len() > 255 {
-                    ast_error!(self, callee_expr, "Cannot call a function with more than 255 arguments");
+                    error!(self, callee_expr, "Cannot call a function with more than 255 arguments");
                 }
 
                 let callee = ctx.run(|ctx| self.get_type(&callee_expr, toplevel, ctx)).await?;
@@ -724,7 +731,7 @@ impl Analyzer {
                     UniLType::Any => Ok(UniLType::Any),
                     UniLType::Callable { args, return_type } => {
                         if args_expr.len() != args.len() {
-                            token_error!(
+                            error!(
                                 self, paren, 
                                 format!(
                                     "Expecting {} arguments but got {}", 
@@ -738,7 +745,7 @@ impl Analyzer {
                         for i in 0 .. args.len() {
                             let arg_type = ctx.run(|ctx| self.get_type(&args_expr[i], toplevel, ctx)).await?;
                             if !args[i].equals(&arg_type) {
-                                ast_error!(
+                                error!(
                                     self, args_expr[i],
                                     format!(
                                         "Argument type does not match parameter type (expecting {} but got {})",
@@ -751,7 +758,7 @@ impl Analyzer {
                         Ok(*return_type)
                     }
                     _ => {
-                        ast_error!(
+                        error!(
                             self, callee_expr,
                             format!("Cannot call type {}", callee.stringify()).as_str()
                         );
@@ -762,7 +769,7 @@ impl Analyzer {
             }
             Expression::Function { name, params: params_expr, return_type: return_expr, body } => {
                 if params_expr.len() > 255 {
-                    token_error!(self, name, "Cannot define a function with more than 255 parameters");
+                    error!(self, name, "Cannot define a function with more than 255 parameters");
                 }
 
                 let return_type = {
@@ -770,7 +777,7 @@ impl Analyzer {
                     if let UniLType::Type(inner) = type_ {
                         *inner
                     } else {
-                        ast_error!(
+                        error!(
                             self, return_expr,
                             format!(
                                 "Expecting type as return type (got {})",
@@ -806,7 +813,7 @@ impl Analyzer {
                             
                             args.push(*inner);
                         } else {
-                            ast_error!(
+                            error!(
                                 self, return_expr,
                                 format!(
                                     "Expecting type as parameter type (got {})",
@@ -867,7 +874,7 @@ impl Analyzer {
                             "copy" | "noMark" | "read" | "getInt" | "readInt" |
                             "readNoMark" | "readDigit" => Ok(UniLType::Any),
                             _ => {
-                                token_error!(
+                                error!(
                                     self, name, 
                                     format!("Unknown property '{}'", name.lexeme).as_str()
                                 );
@@ -884,7 +891,7 @@ impl Analyzer {
                         }
                     }
                     _ => {
-                        ast_error!(
+                        error!(
                             self, object_expr,
                             format!(
                                 "Cannot read properties of type '{}'", 
@@ -912,7 +919,7 @@ impl Analyzer {
                                 if inner.equals(&value) {
                                     *inner
                                 } else {
-                                    ast_error!(
+                                    error!(
                                         self, field.expr,
                                         format!(
                                             "Value type ({}) does not match declared type ({})",
@@ -923,7 +930,7 @@ impl Analyzer {
                                     UniLType::Any
                                 }
                             } else {
-                                ast_error!(
+                                error!(
                                     self, type_spec,
                                     format!(
                                         "Expecting type as type specifier (got {})",
@@ -939,7 +946,7 @@ impl Analyzer {
                     };
 
                     if fields.insert(Rc::clone(&field.name.lexeme), type_.finalize()).is_some() {
-                        token_error!(
+                        error!(
                             self, field.name,
                             format!("Field '{}' was already defined", field.name.lexeme).as_str()
                         );
@@ -974,7 +981,7 @@ impl Analyzer {
                         expected_fields = Some(HashMap::from([(Rc::from("name"), UniLType::String)]));
                     }
                     _ => {
-                        token_error!(
+                        error!(
                             self, name,
                             format!("Invalid algorithm type '{}'", name.lexeme).as_str()
                         );
@@ -989,7 +996,7 @@ impl Analyzer {
                             for (expected_field_name, expected_field_type) in expected {
                                 if let Some(actual_field_type) = borrowed.get(&expected_field_name) {
                                     if !expected_field_type.equals(actual_field_type) {
-                                        ast_error!(
+                                        error!(
                                             self, object_expr, 
                                             format!(
                                                 "Expecting '{}' field of '{}' algorithm declaration to be of type {} but got {}", 
@@ -999,7 +1006,7 @@ impl Analyzer {
                                         );
                                     }
                                 } else {
-                                    ast_error!(
+                                    error!(
                                         self, object_expr, 
                                         format!(
                                             "'{}' algorithm declaration is missing '{}' field", 
@@ -1009,7 +1016,7 @@ impl Analyzer {
                                 }
                             }
                         } else {
-                            ast_error!(
+                            error!(
                                 self, object_expr, 
                                 format!(
                                     "Expecting at least {} fields for '{}' algorithm declaration but got {}", 
@@ -1019,13 +1026,13 @@ impl Analyzer {
                         }
                     }
                 } else {
-                    ast_error!(self, object_expr, "Malformed AST: AlgoDecl object can only be AnonObject");
+                    error!(self, object_expr, "Malformed AST: AlgoDecl object can only be AnonObject");
                 }
 
                 if let Expression::Function { params, name: tok, .. } = &**function {
                     if let Some(arity) = expected_arity {
                         if arity != params.len() {
-                            token_error!(
+                            error!(
                                 self, tok, 
                                 format!(
                                     "Expecting {} parameters for '{}' algorithm but got {}",
@@ -1037,7 +1044,7 @@ impl Analyzer {
 
                     ctx.run(|ctx| self.get_type(&function, toplevel, ctx)).await
                 } else {
-                    ast_error!(self, function, "Malformed AST: AlgoDecl function can only be Function");
+                    error!(self, function, "Malformed AST: AlgoDecl function can only be Function");
                     Ok(UniLType::Any)
                 }
             }
@@ -1046,7 +1053,7 @@ impl Analyzer {
                 let index       = ctx.run(|ctx| self.get_type(&index_expr, toplevel, ctx)).await?;
 
                 if !matches!(subscripted, UniLType::List | UniLType::Any) {
-                    ast_error!(
+                    error!(
                         self, subscripted_expr,
                         format!(
                             "Type {} is not indexable", 
@@ -1056,7 +1063,7 @@ impl Analyzer {
                 }
 
                 if !matches!(index, UniLType::Int | UniLType::Value | UniLType::Any) {
-                    ast_error!(
+                    error!(
                         self, index_expr,
                         format!(
                             "List index must be of type Int or Value, not {}", 
@@ -1097,7 +1104,7 @@ impl Analyzer {
                 let iterator = ctx.run(|ctx| self.get_type(&iterator_expr, toplevel, ctx)).await?;
 
                 if !matches!(iterator, UniLType::Any | UniLType::List | UniLType::Object { .. }) {
-                    ast_error!(
+                    error!(
                         self, iterator_expr,
                         format!(
                             "Type {} is not iterable", 
@@ -1120,7 +1127,7 @@ impl Analyzer {
             Expression::Drop { variable, .. } => {
                 let mut env = self.environment.borrow_mut();
                 if env.del(&variable.lexeme).is_err() {
-                    token_error!(
+                    error!(
                         self, variable, 
                         format!("Unknown variable '{}'", variable.lexeme).as_str()
                     );

@@ -263,12 +263,12 @@ api_layer_fn! {
             let a = expect_int(&args[1], "second argument of 'swap'", univ)?;
             let b = expect_int(&args[2], "third argument of 'swap'", univ)?;
 
-            let right;
+            let left;
             with_timer!(univ, {
-                let tmp = list.get_with_exception(a, univ)?;
-                right = list.get_with_exception(b, univ)?;
-                list.set(a, right.clone()).unwrap();
-                list.set(b, tmp).unwrap();
+                left = list.get_with_exception(a, univ)?;
+                let right = list.get_with_exception(b, univ)?;
+                list.set(a, right).unwrap();
+                list.set(b, left.clone()).unwrap();
             });
 
             univ.swaps += 1;
@@ -278,7 +278,7 @@ api_layer_fn! {
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(list.convert_index(a), aux));
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(list.convert_index(b), aux));
 
-            Ok(right)
+            Ok(left)
         } else {
             Err(univ.vm.create_exception(UniLValue::String(format!(
                 "Expecting list as first argument of 'swap' but got {}",
@@ -358,6 +358,27 @@ api_layer_fn! {
         } else {
             Err(univ.vm.create_exception(UniLValue::String(format!(
                 "Expecting list as first argument of 'List_push' but got {}",
+                args[0].stringify_type()
+            ).into())))
+        }
+    }
+
+    List_pop(args, [UniLType::List], univ, _task) -> (UniLType::Any) {
+        let obj = expect_object(&args[0], "first argument of 'List_pop'", univ)?;
+
+        if let AnyObject::List(list) = &mut *obj.borrow_mut() {
+            let value = with_timer!(univ, list.items.pop());
+            univ.writes += 1;
+
+            let idx = list.items.len() - 1;
+
+            let aux = univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+            univ.highlights.push(HighlightInfo::from_idx_and_aux_write(idx, aux));
+            
+            Ok(value.unwrap_or(UniLValue::Null))
+        } else {
+            Err(univ.vm.create_exception(UniLValue::String(format!(
+                "Expecting list as first argument of 'List_pop' but got {}",
                 args[0].stringify_type()
             ).into())))
         }

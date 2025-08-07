@@ -40,21 +40,29 @@ fn get_filename(target: &Option<String>) -> &str {
     }
 }
 
-fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: bool) -> Result<(), Error> {
-    let target = {
-        if let Some(idx) = args_map.get("--target") {
-            args.remove(*idx);
+fn generate_headers(as_release: bool) -> Result<(), Error> {
+    println!("Generating headers for third-party languages");
 
-            if *idx >= args.len() {
-                return Err(Error::other("Target argument was supplied but no target was specified"));
-            }
+    let mut command = Command::new("cargo");
+    command.arg("run");
 
-            Some(args.remove(*idx))
-        } else {
-            None
-        }
-    };
+    if as_release {
+        command.arg("--release");
+    }
 
+    command.args([
+        "--features", "dev",
+        "--", "--generate-headers"
+    ]);
+
+    if !command.status()?.success() {
+        return Err(Error::other("Compilation failed"));
+    }
+
+    Ok(())
+}
+
+fn release(target: &Option<String>, lite: bool) -> Result<(), Error> {
     let mut command = Command::new("cargo");
     command.arg("build").arg("--release");
 
@@ -62,7 +70,7 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
         command.arg("--features").arg("lite");
     }
 
-    if let Some(target) = &target {
+    if let Some(target) = target {
         command.arg("--target").arg(target);
     }
 
@@ -94,6 +102,8 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     if !lite {
         println!("Copying algorithms to \"dist\" folder");
         clone_dir(&PathBuf::from("algos"), &dist.join("algos"))?;
+        println!("Copying headers to \"dist\" folder");
+        clone_dir(&PathBuf::from("headers"), &dist.join("headers"))?;
     }
     
     println!("Copying automations to \"dist\" folder");
@@ -101,14 +111,40 @@ fn release(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>, lite: 
     println!("Copying profiles to \"dist\" folder");
     clone_dir(&PathBuf::from("profiles"), &dist.join("profiles"))?;
 
+    println!("Copying license to \"dist\" folder");
+    fs::copy("LICENSE", &dist.join("LICENSE"))?;
+    println!("Copying font license to \"dist\" folder");
+    fs::copy(&PathBuf::from("resources").join("FONTLICENSE"), &dist.join("FONTLICENSE"))?;
+
     Ok(())
 }
 
-fn compile_algos() -> Result<(), Error> {
+fn release_full(target: &Option<String>, no_gen_headers: bool) -> Result<(), Error> {
+    if !no_gen_headers {
+        generate_headers(true)?;
+    }
+
+    release(target, false)
+}
+
+fn compile_algos(as_release: bool, headers: bool) -> Result<(), Error> {
     println!("Compiling algorithms into bytecode");
 
     let mut command = Command::new("cargo");
-    command.arg("run").arg("--").arg("--compile-algos");
+    command.arg("run");
+
+    if as_release {
+        command.arg("--release");
+    }
+
+    command.args([
+        "--features", "dev",
+        "--", "--compile-algos"
+    ]);
+
+    if headers {
+        command.arg("--with-headers");
+    }
 
     if !command.status()?.success() {
         return Err(Error::other("Compilation failed"));
@@ -117,13 +153,13 @@ fn compile_algos() -> Result<(), Error> {
     Ok(())
 }
 
-fn release_lite(args: &mut Vec<String>, args_map: &mut HashMap<String, usize>) -> Result<(), Error> {
-    compile_algos()?;
-    release(args, args_map, true)
+fn release_lite(target: &Option<String>, with_headers: bool) -> Result<(), Error> {
+    compile_algos(true, with_headers)?;
+    release(target, true)
 }
 
-fn run_lite() -> Result<(), Error> {
-    compile_algos()?;
+fn run_lite(with_headers: bool) -> Result<(), Error> {
+    compile_algos(false, with_headers)?;
 
     if Command::new("cargo")
         .arg("run")
@@ -155,6 +191,7 @@ fn clean() -> Result<(), Error> {
 
     ok_if_notfound!(fs::remove_file(PathBuf::from("./algos.unib")));
     ok_if_notfound!(fs::remove_dir_all(PathBuf::from("./resources/gen")));
+    ok_if_notfound!(fs::remove_dir_all(PathBuf::from("./headers")));
     Ok(())
 }
 
@@ -184,12 +221,34 @@ fn main() -> Result<(), Error> {
     let mut args: Vec<String> = env::args().collect();
     let mut args_map: HashMap<String, usize> = args.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect();
 
+    // only effective for --release-lite: generates headers while compiling algorithms
+    let with_headers = args_map.contains_key("--with-headers");
+
+    // only effective for --release: avoids generating headers before compiling (useful if compiling both versions)
+    let no_gen_headers = args_map.contains_key("--no-gen-headers");
+    
+    // only effective for --release and --release-lite: specify custom target
+    let target = {
+        if let Some(idx) = args_map.get("--target") {
+            args.remove(*idx);
+
+            if *idx >= args.len() {
+                return Err(Error::other("Target argument was supplied but no target was specified"));
+            }
+
+            Some(args.remove(*idx))
+        } else {
+            None
+        }
+    };
+
     commands! {
         (args, args_map);
         
-        "--release"      -> release(&mut args, &mut args_map, false)?
-        "--release-lite" -> release_lite(&mut args, &mut args_map)?
-        "--run-lite"     -> run_lite()?
+        "--release"      -> release_full(&target, no_gen_headers)?
+        "--release-lite" -> release_lite(&target, with_headers)?
+        "--run-lite"     -> run_lite(with_headers)?
+        "--gen-headers"  -> generate_headers(false)?
         "--clean"        -> clean()?
     };
 

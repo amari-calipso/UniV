@@ -40,30 +40,25 @@ impl BaseDataTrace {
         let width  = rl.get_screen_width() as u32;
         let height = rl.get_screen_height() as u32;
         
-        self.main_texture.take();
-        self.swap_texture.take();
-        self.aux_texture.take();
-        self.aux_swap_texture.take();
-
-        self.main_texture.set(
+        let _ = self.main_texture.set(
             rl.load_render_texture(thread, width, height)
                 .expect("Could not load render texture")
-        ).unwrap();
+        );
 
-        self.swap_texture.set(
+        let _ = self.swap_texture.set(
             rl.load_render_texture(thread, width, height)
                 .expect("Could not load render texture")
-        ).unwrap();
+        );
 
-        self.aux_texture.set(
+        let _ = self.aux_texture.set(
             rl.load_render_texture(thread, width, height / 4)
                 .expect("Could not load render texture")
-        ).unwrap();
+        );
 
-        self.aux_swap_texture.set(
+        let _ = self.aux_swap_texture.set(
             rl.load_render_texture(thread, width, height / 4)
                 .expect("Could not load render texture")
-        ).unwrap();
+        );
     }
 
     pub fn prepare(&mut self, shared: &Shared, rl: &RaylibHandle) {

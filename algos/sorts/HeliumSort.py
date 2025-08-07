@@ -52,7 +52,7 @@ class HeliumSort:
         ll = m-a
         bl = this.bufLen if this.rotateInPlace else (
             0 if this.buffer is None else len(this.buffer))
-        min_ = bl if rl != ll and min([bl, rl, ll]) > this.SMALL_MERGE else 1
+        min_ = bl if rl != ll and min(bl, rl, ll) > this.SMALL_MERGE else 1
         while (ll > min_ and rl > min_) or (rl < this.SMALL_MERGE and rl > 1 and ll < this.SMALL_MERGE and ll > 1):
             if rl < ll:
                 blockSwap(array, a, m, rl)

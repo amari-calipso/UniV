@@ -219,6 +219,19 @@ pub fn expect_string(value: &UniLValue, msg: &str, univ: &mut UniV) -> Result<Rc
     }
 }
 
+pub fn expect_optional_string(value: &UniLValue, msg: &str, univ: &mut UniV) -> Result<Option<Rc<str>>, ExecutionInterrupt> {
+    if let UniLValue::String(x) = value {
+        Ok(Some(Rc::clone(x)))
+    } else if matches!(value, UniLValue::Null) {
+        Ok(None)
+    } else {
+        Err(univ.vm.create_exception(UniLValue::String(format!(
+            "Expecting String or null as {} but got {}",
+            msg, value.stringify_type()
+        ).into())))
+    }
+}
+
 pub fn object_type() -> UniLType {
     UniLType::Object { fields: Rc::new(RefCell::new(HashMap::new())) }
 }

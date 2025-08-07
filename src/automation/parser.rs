@@ -1,4 +1,4 @@
-use crate::token_error;
+use crate::error;
 
 use super::{ast::{Expression, RunAllSortsCategory, Statement}, tokens::{Token, TokenType}};
 
@@ -72,7 +72,7 @@ impl Parser {
             Some(self.advance())
         } else {
             let tok = self.peek();
-            token_error!(self, tok, msg);
+            error!(self, tok, msg);
             None
         }
     }
@@ -95,7 +95,7 @@ impl Parser {
         }
 
         let last = self.peek();
-        token_error!(self, last, "Expecting expression");
+        error!(self, last, "Expecting expression");
         None
     }
 
@@ -138,7 +138,14 @@ impl Parser {
     fn run_shuffle(&mut self) -> Option<Statement> {
         let kw = self.previous().clone();
         let name = self.expression()?;
-        Some(Statement::RunShuffle { kw, name })
+
+        let mut timestamp = false;
+        if self.match_(&[TokenType::With]) {
+            self.consume(TokenType::Timestamp, "Expecting 'timestamp' after 'with'")?;
+            timestamp = true;
+        }
+
+        Some(Statement::RunShuffle { kw, name, timestamp })
     }
 
     fn run_distribution(&mut self) -> Option<Statement> {
@@ -147,11 +154,29 @@ impl Parser {
 
         let mut length = None;
         let mut unique = None;
+        let mut timestamp = false;
         if self.match_(&[TokenType::With]) {
-            for _ in 0 .. 2 {
+            for _ in 0 .. 3 {
                 if self.match_(&[TokenType::Length]) {
+                    if length.is_some() {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify length multiple times");
+                    }
+
                     length = Some(self.expression()?);
+                } else if self.match_(&[TokenType::Timestamp]) {
+                    if timestamp {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify timestamp multiple times");
+                    }
+
+                    timestamp = true;
                 } else {
+                    if unique.is_some() {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify unique amount multiple times");
+                    }
+
                     unique = Some(self.expression()?);
                     self.consume(TokenType::Unique, "Expecting 'unique' after unique amount")?;
                 }
@@ -162,7 +187,7 @@ impl Parser {
             }
         }
 
-        Some(Statement::RunDistribution { kw, name, length, unique })
+        Some(Statement::RunDistribution { kw, name, length, unique, timestamp })
     }
 
     fn run_sort(&mut self) -> Option<Statement> {
@@ -180,17 +205,49 @@ impl Parser {
         let mut length = None;
         let mut speed = None;
         let mut speed_scale = None;
+        let mut max_length = None;
+        let mut timestamp = false;
         if self.match_(&[TokenType::With]) {
-            for _ in 0 .. 2 {
+            for _ in 0 .. 3 {
                 if self.match_(&[TokenType::Length]) {
+                    if length.is_some() {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify length multiple times");
+                    }
+
                     length = Some(self.expression()?);
                 } else if self.match_(&[TokenType::Speed]) {
+                    if speed.is_some() {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify speed multiple times");
+                    }
+
                     speed = Some(self.expression()?);
-                    
+
                     if self.match_(&[TokenType::Scaled]) {
                         self.consume(TokenType::By, "Expecting 'by' after 'scaled'")?;
                         speed_scale = Some(self.expression()?);
                     }
+                } else if self.match_(&[TokenType::Max]) {
+                    let kw = self.previous().clone();
+
+                    if max_length.is_some() {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify max length multiple times");
+                    }
+
+                    self.consume(TokenType::Length, format!("Expecting 'length' after '{}'", kw.lexeme.to_lowercase()).as_str())?;
+                    max_length = Some(self.expression()?);
+                } else if self.match_(&[TokenType::Timestamp]) {
+                    if timestamp {
+                        let tok = self.previous();
+                        error!(self, tok, "Cannot specify timestamp multiple times");
+                    }
+
+                    timestamp = true;
+                } else {
+                    let tok = self.previous();
+                    error!(self, tok, "Expecting 'length', 'speed', 'scaled by', 'max length' or 'timestamp' as item of with clause");
                 }
 
                 if !self.match_(&[TokenType::And]) {
@@ -198,8 +255,8 @@ impl Parser {
                 }
             }
         }
-        
-        Some(Statement::RunSort { kw, name, category, length, speed, speed_scale })
+
+        Some(Statement::RunSort { kw, name, category, length, speed, speed_scale, max_length, timestamp })
     }
 
     fn block(&mut self) -> Option<Vec<Statement>> {
@@ -256,13 +313,13 @@ impl Parser {
                 return self.run_all_shuffles();
             } else {
                 let last = self.peek();
-                token_error!(self, last, "Expecting 'sorts' or 'shuffles' after 'run all'");
+                error!(self, last, "Expecting 'sorts' or 'shuffles' after 'run all'");
                 return None;
             }
         }
 
         let last = self.peek();
-        token_error!(self, last, "Expecting run statement");
+        error!(self, last, "Expecting run statement");
         None
     }
 
@@ -270,7 +327,13 @@ impl Parser {
         let value = self.expression()?;
         Some(Statement::Describe { value })
     }
-    
+
+    fn timestamp_statement(&mut self) -> Option<Statement> {
+        let kw = self.previous().clone();
+        let value = self.expression()?;
+        Some(Statement::Timestamp { kw, value })
+    }
+
     fn statement(&mut self) -> Option<Statement> {
         if self.match_(&[TokenType::Set]) {
             return self.set_statement();
@@ -300,8 +363,12 @@ impl Parser {
             return self.describe_statement();
         }
 
+        if self.match_(&[TokenType::Timestamp]) {
+            return self.timestamp_statement();
+        }
+
         let last = self.peek();
-        token_error!(self, last, "Expecting statement");
+        error!(self, last, "Expecting statement");
         None
     }
 

@@ -774,7 +774,7 @@ def grailSortGivenAux(array, start, length, aux):
 def grailSortRun(array):
     mode: int
     mode = sortingVisualizer.getUserInput("Insert buffer size (0 for in-place, -1 for dynamic)", "0", parseInt)
-    rotate = UniV_getUserRotation("Select rotation algorithm (default: Gries-Mills)").lengths
+    rotate = UniV_getUserRotation("Select rotation algorithm", "Gries-Mills").lengths
     oldRotate = grailSort.grailRotate
     grailSort.grailRotate = rotate
     match mode:
@@ -790,7 +790,7 @@ def grailSortRun(array):
 
 @Sort("Merge Sorts", "Lazy Stable Sort", "Lazy Stable")
 def lazyStableSortRun(array):
-    rotate = UniV_getUserRotation("Select rotation algorithm (default: Gries-Mills)").lengths
+    rotate = UniV_getUserRotation("Select rotation algorithm", "Gries-Mills").lengths
     oldRotate = grailSort.grailRotate
     grailSort.grailRotate = rotate
     grailSort.grailLazyStableSort(array, 0, len(array))

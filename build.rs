@@ -100,10 +100,14 @@ fn generate_module(name: &str, folder: &str, type_: &str, src: &Path) -> Result<
     Ok(())
 }
 
-fn generate_language_module(folder: &str, src: &Path, msg: &str, var_name: &str, type_: &str) -> Result<(), Error> {
+fn generate_language_module(folder: &str, src: &Path, msg: &str) -> Result<(), Error> {
     let mut mods    = String::new();
-    let mut load_fn = format!("pub fn define({var_name}: &mut {type_}) ");
-    load_fn.push_str("{\n");
+    let mut load_fn = String::from("pub fn define(layers: &mut std::collections::HashMap<std::rc::Rc<str>, crate::LanguageLayerFn>) {\n");
+
+    let mut generate_headers_fn = String::from("pub fn generate_headers(\n");
+    push_indent(&mut generate_headers_fn, 1);
+    generate_headers_fn.push_str("globals: &std::collections::HashMap<std::rc::Rc<str>, crate::compiler::type_system::UniLType>\n");
+    generate_headers_fn.push_str(") -> Result<(), std::io::Error> {\n");
 
     let folder_path = src.join(folder);
 
@@ -130,15 +134,22 @@ fn generate_language_module(folder: &str, src: &Path, msg: &str, var_name: &str,
 
         push_indent(&mut load_fn, 1);
         load_fn.push_str(stem);
-        load_fn.push_str("::define(");
-        load_fn.push_str(var_name);
-        load_fn.push_str(");\n");
+        load_fn.push_str("::define(layers);\n");
+
+        push_indent(&mut generate_headers_fn, 1);
+        generate_headers_fn.push_str("crate::__write_header_file!(");
+        generate_headers_fn.push_str(stem);
+        generate_headers_fn.push_str(", globals, \"headers\");\n");
     }
 
     load_fn.push('}');
 
+    push_indent(&mut generate_headers_fn, 1);
+    generate_headers_fn.push_str("Ok(())\n");
+    generate_headers_fn.push('}');
+
     let mut f = File::create(folder_path.join("mod.rs"))?;
-    f.write_all(format!("{}\n{}", mods, load_fn).as_bytes())?;
+    f.write_all(format!("{}\n{}\n\n{}", mods, load_fn, generate_headers_fn).as_bytes())?;
 
     Ok(())
 }
@@ -192,6 +203,7 @@ fn generate_api_layers_module(folder: &str, src: &Path) -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     println!("cargo::rerun-if-changed=src/");
     println!("cargo::rerun-if-changed=resources/");
+    static_vcruntime::metabuild();
 
     let src = PathBuf::from("src");
 
@@ -212,11 +224,7 @@ fn main() -> Result<(), Error> {
     generate_api_layers_module("api_layers", &src)?;
 
     info!("Generating language layers module");
-    generate_language_module(
-        "language_layers", &src, "language",
-        "layers", 
-        "std::collections::HashMap<std::rc::Rc<str>, crate::LanguageLayerFn>"
-    )?;
+    generate_language_module("language_layers", &src, "language")?;
 
     info!("Generating embeddable resized logo");
     let logo = ImageReader::open(resources.join("logo.png"))?.decode()

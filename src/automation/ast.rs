@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::utils::lang::AstPos;
+use alanglib::ast::{SourcePos, WithPosition};
 
 use super::tokens::Token;
 
@@ -10,18 +10,20 @@ pub enum Statement {
     Pop,
     Reset { type_: Token },
     Define { name: Token, value: Expression },
-    RunShuffle { kw: Token, name: Expression },
+    RunShuffle { kw: Token, name: Expression, timestamp: bool },
     Describe { value: Expression },
+    Timestamp { kw: Token, value: Expression },
     RunAllSorts { kw: Token, categories: Vec<RunAllSortsCategory> },
     RunAllShuffles { kw: Token, statements: Vec<Statement> },
     RunDistribution { 
         kw: Token, name: Expression, length: Option<Expression>, 
-        unique: Option<Expression> 
+        unique: Option<Expression>, timestamp: bool 
     },
     RunSort { 
         kw: Token, name: Expression, category: Option<Expression>, 
         length: Option<Expression>, speed: Option<Expression>, 
-        speed_scale: Option<Expression> 
+        speed_scale: Option<Expression>, max_length: Option<Expression>,
+        timestamp: bool
     }
 }
 
@@ -37,14 +39,14 @@ pub enum Expression {
     String(Token)
 }
 
-impl Expression {
-    pub fn get_pos(&self) -> AstPos {
+impl WithPosition for Expression {
+    fn get_pos(&self) -> SourcePos {
         match self {
             Expression::Identifier(token) |
             Expression::Float(token) |
             Expression::Int(token) |
             Expression::String(token) => {
-                AstPos::new(
+                SourcePos::new(
                     Rc::clone(&token.source), 
                     Rc::clone(&token.filename), 
                     token.pos, token.end, token.line

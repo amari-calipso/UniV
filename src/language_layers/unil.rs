@@ -1,9 +1,10 @@
 use crate::language_layer;
 
 language_layer! {
+    language = unil;
     extension = "uni";
 
-    unil::process(source, filename) {
+    process(source, filename) {
         crate::unil::parse(source, filename)
     }
 }

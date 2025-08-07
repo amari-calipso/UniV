@@ -1,7 +1,7 @@
 class QuickSort:
     def __init__(this, pSel):
         if pSel is None:
-            this.pSel = UniV_getUserPivotSelection("Select pivot selection")
+            this.pSel = UniV_getUserPivotSelection("Select pivot selection", None)
         else:
             this.pSel = sortingVisualizer.getPivotSelectionByName(pSel)
 
@@ -59,19 +59,19 @@ class QuickSort:
 llQuickSortKillers = {
     "Linear": [
         "Reversed", "Reversed Sawtooth", "No shuffle", 
-        "Sorted", "Few Random", "Noisy", "Scrambled Tail"
+        "Sorted", "Few random", "Noisy", "Scrambled Tail"
     ], 
     "Quadratic": [
         "Reversed", "Reversed Sawtooth", "Sawtooth", "No shuffle", 
-        "Sorted", "Few Random", "Noisy", "Scrambled Tail"
+        "Sorted", "Few random", "Noisy", "Scrambled Tail"
     ],
     "Quintic": [
         "Reversed", "Reversed Sawtooth", "Sawtooth", "No shuffle", 
-        "Sorted", "Few Random", "Noisy", "Scrambled Tail", "Random"
+        "Sorted", "Few random", "Noisy", "Scrambled Tail", "Random"
     ],
     "Sine Wave": [
         "Reversed", "Reversed Sawtooth", "Sawtooth", "No shuffle", 
-        "Sorted", "Few Random", "Final Merge Pass", "Scrambled Head"
+        "Sorted", "Few random", "Final Merge Pass", "Scrambled Head"
     ],
     "Perlin Noise": ["Sorted"]
 }

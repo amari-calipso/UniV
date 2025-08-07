@@ -1,18 +1,19 @@
 use std::rc::Rc;
 
+use alanglib::{ast::SourcePos, report::warning};
 use libcst_native::{deflated::{AnnAssign, Arg, Assert, Assign, AssignTarget, AssignTargetExpression, Attribute, AugAssign, AugOp, BaseSlice, BinaryOp, BinaryOperation, BooleanOp, BooleanOperation, Break, Call, ClassDef, CompOp, Comparison, CompoundStatement, ConcatenatedString, Continue, Del, DelTargetExpression, Dict, DictElement, Element, Expr, Float, For, FunctionDef, If, IfExp, IndentedBlock, Index, Integer, Lambda, List, Match, MatchCase, MatchPattern, Module, Name, OrElse, Parameters, Raise, Return, SimpleStatementLine, SimpleStatementSuite, SimpleString, SmallStatement, Statement, Subscript, SubscriptElement, Suite, Try, TryStar, Tuple, TypeAlias, UnaryOp, UnaryOperation, While, With}, tokenizer::TokType};
 
-use crate::{ast_error, language_layer, token_error, token_warning, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, AstPos, BaseASTTransformer, Transform}};
+use crate::{error, language_layer, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer, Transform}};
 
 pub struct ASTTransformer {
     base: BaseASTTransformer,
-    last_pos: AstPos,
+    last_pos: SourcePos,
 }
 
 impl ASTTransformer {
     pub fn new(source: String, filename: Rc<str>) -> Self {
         ASTTransformer {
-            last_pos: AstPos::new(Rc::from(source.as_ref()), Rc::clone(&filename), 0, 0, 0),
+            last_pos: SourcePos::new(Rc::from(source.as_ref()), Rc::clone(&filename), 0, 0, 0),
             base: BaseASTTransformer::new(source, filename)
         }
     }
@@ -72,12 +73,12 @@ impl ASTTransformer {
     #[allow(dead_code)]
     pub fn todo(&mut self, tok: &libcst_native::tokenizer::Token) {
         let tok = self.tok(tok);
-        token_error!(self.base, tok, "Not implemented yet");
+        error!(self.base, tok, "Not implemented yet");
     }
 
     #[allow(dead_code)]
     pub fn todo_ast(&mut self, expr: &Expression) {
-        ast_error!(self.base, expr, "Not implemented yet");
+        error!(self.base, expr, "Not implemented yet");
     }
 }
 
@@ -138,15 +139,15 @@ impl Transform for CompoundStatement<'_, '_> {
 
 fn params_to_vec_of_named_expr(params: &Parameters, t: &mut ASTTransformer, tok: &Token) -> Vec<NamedExpr> {
     if !params.kwonly_params.is_empty() {
-        token_error!(t.base, tok, "Keyword-only parameters are not supported");
+        error!(t.base, tok, "Keyword-only parameters are not supported");
     }
 
     if params.star_arg.is_some() {
-        token_error!(t.base, tok, "*args parameters are not supported");
+        error!(t.base, tok, "*args parameters are not supported");
     }
 
     if params.star_kwarg.is_some() {
-        token_error!(t.base, tok, "**kwargs parameters are not supported");
+        error!(t.base, tok, "**kwargs parameters are not supported");
     }
 
     let mut result = Vec::new();
@@ -154,7 +155,7 @@ fn params_to_vec_of_named_expr(params: &Parameters, t: &mut ASTTransformer, tok:
     for param in params.posonly_params.iter().chain(params.params.iter()) {
         if param.default.is_some() {
             let token = t.tok(param.equal.as_ref().unwrap().tok);
-            token_error!(t.base, token, "Default arguments are not supported");
+            error!(t.base, token, "Default arguments are not supported");
         }
 
         result.push(NamedExpr {
@@ -187,7 +188,7 @@ impl Transform for FunctionDef<'_, '_> {
         let def_tok = t.tok(self.def_tok);
 
         if t.base.depth != 0 {
-            token_warning!(def_tok, "Closures are not supported. This function will be defined in the global scope");
+            warning(&def_tok, "Closures are not supported. This function will be defined in the global scope");
         }
 
         t.base.inc_depth();
@@ -215,7 +216,8 @@ impl Transform for FunctionDef<'_, '_> {
                     match name.lexeme.to_lowercase().as_ref() {
                         "sort" => {
                             if args.len() < 3 || args.len() > 4 {
-                                ast_error!(t.base, decorator, format!("Expecting 3 or 4 arguments for sort decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 3 or 4 arguments for sort decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             let mut fields = vec![
@@ -255,7 +257,8 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "shuffle" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for shuffle decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for shuffle decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -275,7 +278,8 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "distribution" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for distribution decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for distribution decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -295,7 +299,8 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "pivotselection" => {
                             if args.len() != 1 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 argument for pivot selection decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 argument for pivot selection decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             return Expression::AlgoDecl { 
@@ -315,7 +320,8 @@ impl Transform for FunctionDef<'_, '_> {
                         }
                         "rotation" => {
                             if args.len() == 0 || args.len() > 2 {
-                                ast_error!(t.base, decorator, format!("Expecting 1 or 2 arguments for rotation decorator but got {}", args.len()).as_str());
+                                error!(t.base, decorator, format!("Expecting 1 or 2 arguments for rotation decorator but got {}", args.len()).as_str());
+                                return make_null();
                             }
 
                             let mut name = None;
@@ -353,11 +359,11 @@ impl Transform for FunctionDef<'_, '_> {
                 }
             } 
 
-            ast_error!(t.base, decorator, "Unsupported decorator");
+            error!(t.base, decorator, "Unsupported decorator");
             function
         } else {
             let tok = t.tok(self.decorators.first().unwrap().at_tok);
-            token_error!(t.base, tok, "Only one decorator is supported");
+            error!(t.base, tok, "Only one decorator is supported");
             function
         }
     }
@@ -464,7 +470,7 @@ impl Transform for For<'_, '_> {
                     if let Expression::Variable { name } = expr {
                         name
                     } else {
-                        ast_error!(t.base, expr, "Only variables are supported as target of for loop");
+                        error!(t.base, expr, "Only variables are supported as target of for loop");
                         t.tok(self.for_tok)
                     }
                 }, 
@@ -507,7 +513,7 @@ macro_rules! transform_try {
         {
             if $node.handlers.len() > 1 {
                 let tok = $t.tok($node.handlers.first().unwrap().except_tok);
-                token_error!($t.base, tok, "Only one exception handler is supported");
+                error!($t.base, tok, "Only one exception handler is supported");
             }
     
             let try_branch;
@@ -571,7 +577,12 @@ impl Transform for With<'_, '_> {
     // https://peps.python.org/pep-0343/
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.items.len() != 1 {
-            ast_error!(t.base, self.items.first().unwrap().item.to_ast(t), "Only one with item is supported");
+            let expr = self.items.first().unwrap().item.to_ast(t);
+            error!(t.base, expr, "Only one with item is supported");
+
+            if self.items.len() == 0 {
+                return make_null();
+            }
         }
 
         let t0 = t.base.tmp_var();
@@ -655,7 +666,7 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
             if x.value.value == "_" {
                 None
             } else {
-                token_error!(t.base, tok, "Unsupported kind of pattern");
+                error!(t.base, tok, "Unsupported kind of pattern");
                 None
             }
         }
@@ -666,7 +677,7 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
                 if name.value == "_" {
                     None
                 } else {
-                    token_error!(t.base, tok, "Unsupported kind of pattern");
+                    error!(t.base, tok, "Unsupported kind of pattern");
                     None
                 }
             } else {
@@ -681,14 +692,14 @@ fn transform_pattern(pattern: &MatchPattern, t: &mut ASTTransformer, tok: &Token
                     }
                 }
 
-                token_error!(t.base, tok, "Unsupported kind of pattern");
+                error!(t.base, tok, "Unsupported kind of pattern");
                 make_null()
             }).collect())
         }
         MatchPattern::Mapping(_) |
         MatchPattern::Sequence(_) | 
         MatchPattern::Class(_) => {
-            token_error!(t.base, tok, "Unsupported kind of pattern");
+            error!(t.base, tok, "Unsupported kind of pattern");
             None
         }
     }
@@ -760,7 +771,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
         match &element {
             Expression::Assign { target, op, value, .. } => {
                 if !matches!(op.type_, TokenType::Walrus) {
-                    token_error!(t.base, op, "Only '=' assignments are allowed in class body");
+                    error!(t.base, op, "Only '=' assignments are allowed in class body");
                 }
 
                 if let Expression::Variable { name } = &**target {
@@ -769,7 +780,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
 
                     fields.push(ObjectField::new(name.clone(), *value.clone(), Some(Expression::Variable { name: any })));
                 } else {
-                    ast_error!(t.base, target, "Only variables are supported as assignment targets in class body");
+                    error!(t.base, target, "Only variables are supported as assignment targets in class body");
                 }
             }
             Expression::Function { name, params, .. } => {
@@ -779,7 +790,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
                 }
 
                 if params.len() == 0 {
-                    token_error!(t.base, name, "Methods must take at least 1 parameter (static methods are not supported)");
+                    error!(t.base, name, "Methods must take at least 1 parameter (static methods are not supported)");
                 }
 
                 let mut tok = name.clone();
@@ -797,7 +808,7 @@ fn get_class_definitions(body: &Vec<Expression>, class_name: &Token, fields: &mu
             Expression::Block { expressions, .. } => {
                 get_class_definitions(expressions, class_name, fields, init, t);
             }
-            _ => ast_error!(t.base, element, "Unsupported definition in class body")
+            _ => error!(t.base, element, "Unsupported definition in class body")
         }
     }
 }
@@ -808,12 +819,12 @@ impl Transform for ClassDef<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if !self.decorators.is_empty() {
             let tok = t.tok(self.decorators.first().unwrap().at_tok);
-            token_warning!(tok, "Decorators are not supported on classes. Ignoring");
+            warning(&tok, "Decorators are not supported on classes. Ignoring");
         }
 
         if !self.keywords.is_empty() || !self.bases.is_empty() {
             let tok = t.tok(self.class_tok);
-            token_warning!(tok, "Inheritance is not supported. Ignoring");
+            warning(&tok, "Inheritance is not supported. Ignoring");
         }
 
         let class_name = get_token_from_variable(self.name.to_ast(t));
@@ -895,7 +906,7 @@ impl Transform for SmallStatement<'_, '_> {
             SmallStatement::TypeAlias(x) => x.to_ast(t),
             SmallStatement::Global(x) => {
                 let tok = t.tok(x.tok);
-                token_error!(t.base, tok, "Editing globals from a local scope is not supported");
+                error!(t.base, tok, "Editing globals from a local scope is not supported");
                 make_null()
             } 
         }
@@ -932,12 +943,7 @@ impl Transform for Break<'_, '_> {
     type Transformer = ASTTransformer;
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
-        let tok;
-        if let Some(semicolon) = &self.semicolon {
-            tok = t.tok(semicolon.tok);
-        } else {
-            tok = t.tok_from_last_pos();
-        }
+        let tok = t.tok(self.tok);
 
         let mut name = tok.clone();
         name.set_lexeme("__Python_break");
@@ -971,11 +977,7 @@ impl Transform for Continue<'_, '_> {
     type Transformer = ASTTransformer;
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
-        if let Some(semicolon) = &self.semicolon {
-            Expression::Continue { kw: t.tok(semicolon.tok), value: None }
-        } else {
-            Expression::Continue { kw: t.tok_from_last_pos(), value: None }
-        }
+        Expression::Continue { kw: t.tok(self.tok), value: None }
     }
 }
 
@@ -1001,6 +1003,47 @@ impl Transform for Expr<'_, '_> {
 macro_rules! tuple_assign {
     ($slf: ident, $t: ident, $op: ident, $tuple: ident) => {
         {
+            let value = $slf.value.to_ast($t);
+
+            // look for array[a], array[b] = array[b], array[a] pattern and replace it with swap(array, a, b)
+            if let Expression::List { items, .. } = &value {
+                if $tuple.elements.len() == 2 && items.len() == 2 {
+                    let element0 = $tuple.elements[0].to_ast($t);
+                    let element1 = $tuple.elements[1].to_ast($t);
+
+                    if let Expression::Subscript { subscripted: left_sub, index: left_idx, .. } = &element0 {
+                        if let Expression::Subscript { subscripted: right_sub, index: right_idx, .. } = &element1 {
+                            if element0.equals(&items[1]) && element1.equals(&items[0]) && left_sub.equals(&right_sub) {
+                                return Expression::Block { 
+                                    opening_brace: $op.clone(), 
+                                    expressions: vec![
+                                        // subscript operation would normally be evaluated 4 times, so clone it to keep side effects (if any)
+                                        *left_sub.clone(),
+                                        *left_sub.clone(),
+                                        *left_sub.clone(), 
+                                        // left and right indices would be evaluated 1 additional time each, so do the same
+                                        *left_idx.clone(),
+                                        *right_idx.clone(),
+                                        // now output the call itself
+                                        Expression::Call { 
+                                            callee: Box::new(Expression::Variable { 
+                                                name: {
+                                                    let mut name = $op.clone();
+                                                    name.set_lexeme("swap");
+                                                    name
+                                                }
+                                            }),
+                                            paren: $op, 
+                                            args: vec![*left_sub.clone(), *left_idx.clone(), *right_idx.clone()] 
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             let tmp = $t.base.tmp_var();
 
             let mut name = $op.clone();
@@ -1017,7 +1060,7 @@ macro_rules! tuple_assign {
                     Expression::Assign {
                         target: tmp_var.clone(),
                         op: $op.clone(),
-                        value: Box::new($slf.value.to_ast($t)),
+                        value: Box::new(value),
                         type_spec: None
                     }
                 ].into_iter().chain($tuple.elements.iter().enumerate().map(|(i, x)| {
@@ -1131,17 +1174,17 @@ impl Transform for AssignTargetExpression<'_, '_> {
             AssignTargetExpression::Subscript(x) => x.to_ast(t),
             AssignTargetExpression::Tuple(x) => {
                 let expr = x.to_ast(t);
-                ast_error!(t.base, expr, "Unsupported assignment target");
+                error!(t.base, expr, "Unsupported assignment target");
                 make_null()
             }
             AssignTargetExpression::List(x) => {
                 let expr = x.to_ast(t);
-                ast_error!(t.base, expr, "Unsupported assignment target");
+                error!(t.base, expr, "Unsupported assignment target");
                 make_null()
             }
             AssignTargetExpression::StarredElement(x) => {
                 let tok = t.tok(x.star_tok);
-                token_error!(t.base, tok, "Unpacking is not supported");
+                error!(t.base, tok, "Unpacking is not supported");
                 make_null()
             }
         }
@@ -1153,7 +1196,7 @@ impl Transform for Name<'_, '_> {
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         let name = t.base.get_var_name(self.value);
-        Expression::Variable { name: t.tok_from_last_pos_with_lexeme(&name) }
+        Expression::Variable { name: t.tok_with_lexeme(self.tok, &name) }
     }
 }
 
@@ -1175,7 +1218,7 @@ impl Transform for Subscript<'_, '_> {
         let paren = t.tok(self.lbracket.tok);
 
         if self.slice.len() != 1 {
-            token_error!(t.base, paren, "Slicing is not supported");
+            error!(t.base, paren, "Slicing is not supported");
         }
 
         Expression::Subscript {
@@ -1202,7 +1245,7 @@ impl Transform for BaseSlice<'_, '_> {
             BaseSlice::Index(x) => x.to_ast(t),
             BaseSlice::Slice(x) => {
                 let tok = t.tok(x.first_colon.tok);
-                token_error!(t.base, tok, "Slicing is not supported");
+                error!(t.base, tok, "Slicing is not supported");
                 make_null()
             }
         }
@@ -1215,7 +1258,7 @@ impl Transform for Index<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.star.is_some() {
             let tok = t.tok(self.star_tok.unwrap());
-            token_error!(t.base, tok, "Unsupported syntax");
+            error!(t.base, tok, "Unsupported syntax");
         }
 
         self.value.to_ast(t)
@@ -1443,7 +1486,7 @@ impl Transform for AugAssign<'_, '_> {
                     type_spec = Some(Box::new(Expression::Variable { name: t.tok_with_lexeme(tok, "any") }));
 
                     let tok = t.tok(tok);
-                    token_error!(t.base, tok, "Unsupported operator");
+                    error!(t.base, tok, "Unsupported operator");
                     tok
                 }
             }
@@ -1484,7 +1527,7 @@ impl Transform for Del<'_, '_> {
                 variable: get_token_from_variable(name.to_ast(t))
             }
         } else {
-            token_error!(t.base, kw, "Only deletion of variables is supported");
+            error!(t.base, kw, "Only deletion of variables is supported");
             make_null()
         }
     }
@@ -1495,7 +1538,7 @@ impl Transform for TypeAlias<'_, '_> {
 
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         let tok = t.tok(self.type_tok);
-        token_error!(t.base, tok, "Type aliases are not supported");
+        error!(t.base, tok, "Type aliases are not supported");
         make_null()
     }
 }
@@ -1535,7 +1578,7 @@ impl Transform for libcst_native::deflated::Expression<'_, '_> {
             Self::Await(_) |
             Self::FormattedString(_) => {
                 let tok = t.tok_from_last_pos();
-                token_error!(t.base, tok, "Unsupported expression");
+                error!(t.base, tok, "Unsupported expression");
                 make_null()
             }
             _ => make_null()
@@ -1549,7 +1592,7 @@ impl Transform for Integer<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal {
             value: Rc::from(self.value), // TODO: we should convert this to a valid rust-parsable int literal
-            tok: t.tok_from_last_pos(),
+            tok: t.tok(self.tok),
             kind: LiteralKind::Int
         }
     }
@@ -1561,7 +1604,7 @@ impl Transform for Float<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal {
             value: Rc::from(self.value), // TODO: we should convert this to a valid rust-parsable float literal
-            tok: t.tok_from_last_pos(),
+            tok: t.tok(self.tok),
             kind: LiteralKind::Float
         }
     }
@@ -1624,7 +1667,7 @@ impl Transform for Comparison<'_, '_> {
                         CompOp::IsNot { is_tok, .. } => t.tok_with_type(is_tok, TokenType::BangEqual),
                         CompOp::In { tok } | CompOp::NotIn { in_tok: tok, .. } => {
                             let tok = t.tok(tok);
-                            token_error!(t.base, tok, "Unsupported syntax");
+                            error!(t.base, tok, "Unsupported syntax");
                             continue;
                         }
                     }
@@ -1747,7 +1790,7 @@ impl Transform for BinaryOperation<'_, '_> {
                 }
                 BinaryOp::MatrixMultiply { tok } => {
                     let tok = t.tok(tok);
-                    token_error!(t.base, tok, "Unsupported operator");
+                    error!(t.base, tok, "Unsupported operator");
                     tok
                 }
             }
@@ -1810,7 +1853,7 @@ impl Transform for Element<'_, '_> {
             Element::Simple { value, .. } => value.to_ast(t),
             Element::Starred(x) => {
                 let tok = t.tok(x.star_tok);
-                token_error!(t.base, tok, "Unpacking is not supported");
+                error!(t.base, tok, "Unpacking is not supported");
                 make_null()
             }
         }
@@ -1835,7 +1878,7 @@ impl Transform for Dict<'_, '_> {
                                 tok.set_lexeme(&value);
                                 tok
                             } else {
-                                ast_error!(t.base, key_expr, "Unsupported dictionary key");
+                                error!(t.base, key_expr, "Unsupported dictionary key");
                                 t.tok(colon_tok)
                             }
                         };
@@ -1848,7 +1891,7 @@ impl Transform for Dict<'_, '_> {
                     }
                     DictElement::Starred(x) => {
                         let tok = t.tok(x.star_tok);
-                        token_error!(t.base, tok, "Unpacking is not supported");
+                        error!(t.base, tok, "Unpacking is not supported");
                         
                         ObjectField {
                             name: tok,
@@ -1897,6 +1940,53 @@ impl Transform for Call<'_, '_> {
                     }
                     _ => ()
                 }
+            }
+
+            match name.lexeme.as_ref() {
+                "append" => {
+                    if self.args.len() == 1 {
+                        return Expression::Call { 
+                            callee: Box::new(Expression::Variable { name: t.tok_with_lexeme(self.lpar_tok, "List_push") }), 
+                            paren: t.tok(self.lpar_tok), 
+                            args: vec![*object.clone(), self.args.first().unwrap().to_ast(t)]
+                        };
+                    }
+                }
+                "pop" => {
+                    match self.args.len() {
+                        0 => {
+                            return Expression::Call { 
+                                callee: Box::new(Expression::Variable { 
+                                    name: t.tok_with_lexeme(self.lpar_tok, "List_pop") 
+                                }), 
+                                paren: t.tok(self.lpar_tok), 
+                                args: vec![*object.clone()]
+                            };
+                        }
+                        1 => {
+                            return Expression::Call { 
+                                callee: Box::new(Expression::Variable { 
+                                    name: t.tok_with_lexeme(self.lpar_tok, "List_removeIdx") 
+                                }), 
+                                paren: t.tok(self.lpar_tok), 
+                                args: vec![*object.clone(), self.args.first().unwrap().to_ast(t)]
+                            };
+                        }
+                        _ => ()
+                    }
+                }
+                "clear" => {
+                    if self.args.len() == 0 {
+                        return Expression::Call { 
+                            callee: Box::new(Expression::Variable { 
+                                name: t.tok_with_lexeme(self.lpar_tok, "List_clear") 
+                            }), 
+                            paren: t.tok(self.lpar_tok), 
+                            args: vec![*object.clone()]
+                        };
+                    }
+                }
+                _ => ()
             }
 
             if matches!(&**object, Expression::Variable { .. }) {
@@ -1986,12 +2076,12 @@ impl Transform for Arg<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if self.keyword.is_some() {
             let tok = t.tok(self.equal.as_ref().unwrap().tok);
-            token_error!(t.base, tok, "Keyword arguments are not supported");
+            error!(t.base, tok, "Keyword arguments are not supported");
         }
 
         if let Some(tok) = self.star_tok {
             let tok = t.tok(tok);
-            token_error!(t.base, tok, "Unpacking is not supported");
+            error!(t.base, tok, "Unpacking is not supported");
         }
 
         self.value.to_ast(t)
@@ -2018,7 +2108,7 @@ impl Transform for Lambda<'_, '_> {
         let lambda_tok = t.tok(self.lambda_tok);
 
         if t.base.depth != 0 {
-            token_warning!(lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
+            warning(&lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
         }
 
         t.base.inc_depth();
@@ -2040,7 +2130,7 @@ impl Transform for SimpleString<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         Expression::Literal { 
             value: Rc::from(self.value.trim_matches(|x| x == '"' || x == '\'')), 
-            tok: t.tok_from_last_pos(), 
+            tok: t.tok(self.tok), 
             kind: LiteralKind::String 
         }
     }
@@ -2067,7 +2157,7 @@ impl Transform for libcst_native::deflated::String<'_, '_> {
             Self::Concatenated(x) => x.to_ast(t),
             Self::Formatted(_) => {
                 let tok = t.tok_from_last_pos();
-                token_error!(t.base, tok, "Formatted strings are not supported");
+                error!(t.base, tok, "Formatted strings are not supported");
                 make_null()
             }
         }
@@ -2094,10 +2184,142 @@ impl Transform for libcst_native::deflated::NamedExpr<'_, '_> {
     }
 }
 
+mod headers {
+    use std::{collections::HashMap, rc::Rc};
+
+    use crate::{compiler::type_system::UniLType, utils::lang::push_indent};
+
+    fn stringify_type(type_: &UniLType) -> String {
+        match type_ {
+            UniLType::Type(inner) => stringify_type(&inner),
+            UniLType::Any | UniLType::Object { .. } => String::from("object"),
+            UniLType::Null => String::from("None"),
+            UniLType::Int => String::from("int"),
+            UniLType::Float => String::from("float"),
+            UniLType::Value => String::from("Value"),
+            UniLType::String => String::from("str"),
+            UniLType::List => String::from("list"),
+            UniLType::Callable { args, return_type } => {
+                let mut buf = String::from("Callable[[");
+
+                for (i, param) in args.iter().enumerate() {
+                    buf.push_str(&stringify_type(param));
+
+                    if i + 1 != args.len() {
+                        buf.push_str(", ")
+                    }
+                }
+
+                buf.push_str("], ");
+                buf.push_str(&stringify_type(&return_type));
+                buf.push(']');
+                buf
+            }
+            UniLType::Group(types) => {
+                let mut buf = String::new();
+
+                for (i, type_) in types.iter().enumerate() {
+                    buf.push_str(&stringify_type(type_));
+
+                    if i + 1 != types.len() {
+                        buf.push_str(" | ")
+                    }
+                }
+
+                buf
+            }
+        }
+    }
+
+    pub fn make(globals: &HashMap<Rc<str>, UniLType>, buf: &mut String, indent: usize) {
+        for (name, type_) in globals {
+            match type_ {
+                UniLType::Type(inner) => {
+                    if matches!(&**inner, UniLType::Null) {
+                        continue;
+                    }
+
+                    let stringified = stringify_type(inner);
+
+                    if name.as_ref() == stringified.as_str() {
+                        continue;
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str(name);
+                    buf.push_str(" = ");
+                    buf.push_str(&stringified);
+                    buf.push('\n');
+                }
+                UniLType::Object { fields } => {
+                    push_indent(buf, indent);
+                    buf.push_str("class ");
+                    buf.push_str(name);
+                    buf.push_str(":\n");
+                    make(&fields.borrow(), buf, indent + 1);
+                }
+                UniLType::Callable { args, return_type } => {
+                    match name.as_ref() {
+                        "str" | "int" | "float" => continue,
+                        _ => ()
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str("def ");
+                    buf.push_str(name);
+                    buf.push('(');
+
+                    for (i, arg) in args.iter().enumerate() {
+                        // if indent is not 0, we are in a class. methods have an extra field that 
+                        // is an artifact of transpilation (every call to a method is translated to object.method(object, args...)).
+                        // but because to the IDEs the methods will look like they're static when you call them, 
+                        // we skip the first one when we're in a class, so the IDE gives proper hints
+                        if indent != 0 && i == 0 {
+                            continue;
+                        }
+
+                        buf.push_str("arg");
+                        buf.push_str(&i.to_string());
+                        buf.push_str(": ");
+                        buf.push_str(&stringify_type(arg));
+
+                        if i + 1 != args.len() {
+                            buf.push_str(", ")
+                        }
+                    }
+
+                    buf.push_str(") -> ");
+                    buf.push_str(&stringify_type(return_type));
+                    buf.push_str(": ...\n");
+                }
+                _ => {
+                    match name.as_ref() {
+                        "True" | "False" | "None" | "__name__" => continue,
+                        _ => ()
+                    }
+
+                    let stringified = stringify_type(type_);
+
+                    if name.as_ref() == stringified.as_str() {
+                        continue;
+                    }
+
+                    push_indent(buf, indent);
+                    buf.push_str(name);
+                    buf.push_str(": ");
+                    buf.push_str(&stringified);
+                    buf.push('\n');
+                }
+            }
+        }
+    }
+}
+
 language_layer! {
+    language = python;
     extension = "py";
 
-    python::process(source, filename) {
+    process(source, filename) {
         use crate::language_layers::python;
         use crate::utils::lang::Transform;
         use crate::unil::ast::Expression;
@@ -2135,5 +2357,35 @@ language_layer! {
         } else {
             unreachable!()
         }
+    }
+
+    generate_headers(globals) {
+        let mut declarations = String::from(r#"from typing import Callable, Tuple
+from enum import IntEnum
+
+class Value:
+    def copy(self) -> "Value": ...
+    def noMark(self) -> "Value": ...
+    def read(self) -> "Value": ...
+    def getInt(self) -> int: ...
+    def readInt(self) -> int: ...
+    def readNoMark(self) -> Tuple["Value", None]: ...
+    def readDigit(self) -> int: ...
+    def swap(self, other: "Value") -> "Value": ...
+    def write(self, other: "Value" | int) -> "Value": ...
+    def writeRestoreIdx(self, other: "Value" | int, idx: None) -> "Value": ...
+
+class RotationMode(IntEnum):
+    INDEXED, LENGTHS = range(2)
+
+def Sort(category: str, name: str, listName: str, killers: str | None = None): ...
+def Shuffle(name: str): ...
+def Distribution(name: str): ...
+def PivotSelection(name: str): ...
+def Rotation(name: str, mode: RotationMode = RotationMode.INDEXED): ...
+
+"#);
+        headers::make(globals, &mut declarations, 0);
+        declarations
     }
 }

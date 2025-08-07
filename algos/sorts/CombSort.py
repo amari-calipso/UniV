@@ -21,7 +21,7 @@ class CombSort:
             i = a
             while gap+i < b:
                 if array[i] > array[i+gap]:
-                    array[i].swap(array[i+gap])
+                    array[i], array[i+gap] = array[i+gap], array[i]
                     swapped = True
                 i += 1
 

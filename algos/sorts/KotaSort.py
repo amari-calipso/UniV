@@ -120,7 +120,7 @@ class KotaSort:
             k += 1
             c += 1
             if c == bLen:
-                sortingVisualizer.delay(1000)
+                sortingVisualizer.delay(250)
                 array[k-bLen].swap(array[tp])
                 tp += 1
                 if left:
@@ -144,7 +144,7 @@ class KotaSort:
         i = a+bLen
         j = t
         while i < m:
-            sortingVisualizer.delay(1000)
+            sortingVisualizer.delay(250)
             array[i].swap(array[j])
             i += bLen
             j += 1
@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
 @Sort("Block Merge Sorts", "Kota Sort", "Kota Sort")
 def kotaSortRun(array):
-    rotate = UniV_getUserRotation("Select rotation algorithm (default: Cycle Reverse)").indexed
+    rotate = UniV_getUserRotation("Select rotation algorithm", "Cycle Reverse").indexed
     oldRotate = kotaSort.rotate
     kotaSort.rotate = rotate
     kotaSort.sort(array, 0, len(array))

@@ -22,6 +22,10 @@ impl AnalyzerEnvironment {
         AnalyzerEnvironment { values: HashMap::new(), enclosing: Some(enclosing) }
     }
 
+    pub fn get_locals(&self) -> &HashMap<Rc<str>, UniLType> {
+        &self.values
+    }
+
     pub fn define(&mut self, name: &Rc<str>, value: UniLType) {
         if name.as_ref() == "_" {
             return;

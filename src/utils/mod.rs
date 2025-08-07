@@ -1,4 +1,6 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
+
+use raylib::ffi::TraceLogLevel;
 
 pub mod lang;
 pub mod gfx;
@@ -120,10 +122,6 @@ macro_rules! expect_traceback {
     };
 }
 
-pub fn substring(string: &str, a: usize, b: usize) -> String {
-    string.chars().skip(a).take(b - a).collect()
-}
-
 pub fn translate(value: f64, min: f64, max: f64, min_result: f64, max_result: f64) -> f64 {
     let delta_orig = max - min;
     let delta_out  = max_result - min_result;
@@ -148,4 +146,34 @@ macro_rules! with_timer {
             res
         }
     };
+}
+
+pub fn duration_to_hms(duration: &Duration) -> String {
+    let mut s = duration.as_secs();
+    let mut h = 0u8;
+    let mut m = 0u8;
+    
+    while s >= 60 {
+        s -= 60;
+        m += 1;
+    }
+
+    while m >= 60 {
+        m -= 60;
+        h += 1;
+    }
+
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+pub fn report_errors<T: ToString>(msg: &str, errors: &Vec<T>) -> String {
+    let mut error_buf = format!("{}:", msg);
+
+    for error in errors {
+        error_buf.push('\n');
+        error_buf.push_str(&error.to_string());
+    }
+
+    log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
+    error_buf
 }

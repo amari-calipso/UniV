@@ -1,8 +1,9 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use alanglib::ast::{SourcePos, WithPosition};
 use analyzer::Analyzer;
 
-use crate::{unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}, utils::lang::AstPos};
+use crate::{compiler::environment::AnalyzerEnvironment, unil::{ast::{Expression, LiteralKind}, tokens::{Token, TokenType}}, univm::{bytecode::{Bytecode, Instruction}, environment::Environment, object::UniLValue}};
 
 pub mod analyzer;
 pub mod environment;
@@ -79,7 +80,7 @@ impl Compiler {
 
     fn push_instruction_tok(&mut self, instruction: Instruction, token: &Token) {
         self.output.instructions.push(instruction);
-        self.output.positions.push(AstPos::new(
+        self.output.positions.push(SourcePos::new(
             Rc::clone(&token.source), 
             Rc::clone(&token.filename), 
             token.pos, 
@@ -666,6 +667,8 @@ impl Compiler {
                 }, op);
             }
             Expression::Function { name, params, body, .. } => {
+                let algorithm_type = self.last_algo_type.take();
+
                 let function_decl_idx = self.output.instructions.len();
                 self.push_instruction(Instruction::Null, expr); // placeholder
                 let skip_function_jmp_idx = self.output.instructions.len();
@@ -683,7 +686,7 @@ impl Compiler {
                 self.output.instructions[function_decl_idx] = Instruction::FunctionDecl { 
                     address: function_idx as u64, name_idx, 
                     parameters: params.iter().map(|param| self.name_idx(&param.name.lexeme)).collect(), 
-                    algorithm_type: self.last_algo_type.take()
+                    algorithm_type
                 };
 
                 self.output.instructions[function_idx] = Instruction::Catch(self.output.instructions.len() as u64);
@@ -695,8 +698,11 @@ impl Compiler {
                 ctx.run(|ctx| self.compile_one(&object, ctx)).await;
 
                 let type_idx = self.name_idx(&name.lexeme);
+
+                let previous_algo_type = self.last_algo_type.clone();
                 self.last_algo_type = Some(type_idx);
                 ctx.run(|ctx| self.compile_one(&function, ctx)).await;
+                self.last_algo_type = previous_algo_type;
             }
         }
     }
@@ -721,7 +727,7 @@ impl Compiler {
     }
 }
 
-pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<Bytecode, Vec<String>> {
+pub fn compile_and_get_globals(expressions: &Vec<Expression>, globals: &Environment) -> Result<(Bytecode, Rc<RefCell<AnalyzerEnvironment>>), Vec<String>> {
     let mut analyzer = Analyzer::new(globals);
     analyzer.analyze(expressions);
 
@@ -731,5 +737,10 @@ pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<B
 
     let mut compiler = Compiler::new();
     compiler.compile(expressions);
-    Ok(compiler.output)
+    Ok((compiler.output, analyzer.globals))
+}
+
+#[allow(dead_code)]
+pub fn compile(expressions: &Vec<Expression>, globals: &Environment) -> Result<Bytecode, Vec<String>> {
+    Ok(compile_and_get_globals(expressions, globals)?.0)
 }

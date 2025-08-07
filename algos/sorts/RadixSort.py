@@ -20,7 +20,7 @@ class RadixSort:
             
         if empty:
             for j in range(len(aux)):
-                List_clear(aux[j])
+                aux[j].clear()
 
     def LSD(this, array, a, b):
         this.arrayLen = b-a

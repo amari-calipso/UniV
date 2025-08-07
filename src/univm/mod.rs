@@ -1,12 +1,13 @@
 use std::{cell::{OnceCell, RefCell}, collections::{HashMap, HashSet}, rc::Rc};
 
+use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
 use environment::Environment;
 use object::{AnonObject, AnyCallable, AnyObject, Callable, ExecutionInterrupt, Function, List, NativeCallable, UniLValue};
 use raylib::ffi::TraceLogLevel;
 use serde::Serializer;
 
-use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, get_expect, highlights::HighlightInfo, log, utils::{lang::{traceback_part, AstPos}, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
+use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, get_expect, highlights::HighlightInfo, log, utils::{lang::traceback_part, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
 
 pub mod object;
 pub mod environment;
@@ -151,6 +152,7 @@ impl std::fmt::Debug for ExceptionHandler {
     }
 }
 
+#[derive(Debug)]
 pub struct Task {
     pub ip: u64,
     pub environment: Rc<RefCell<Environment>>,
@@ -160,7 +162,7 @@ pub struct Task {
     pub call_stack: Vec<u64>,
     pub exception_handlers_stack: Vec<ExceptionHandler>,
     pub exception: Option<UniLValue>,
-    pub pos_stack: Vec<AstPos>,
+    pub pos_stack: Vec<SourcePos>,
 
     pub running: bool,
     pub started: bool
@@ -317,7 +319,26 @@ impl Task {
                     return self.stack.push(UniLValue::String(x.repeat(*times as usize).into()));
                 }
             }
-            UniLValue::Null | UniLValue::Object(_) => ()
+            UniLValue::Object(obj) => {
+                if let AnyObject::List(list) = &*obj.borrow() {
+                    if let UniLValue::Int(times) = right {
+                        if *times < 0 {
+                            self.exception = Some(UniLValue::String(Rc::from("Cannot repeat list a negative amount of times")));
+                            return;
+                        }
+
+                        let mut output = Vec::new();
+                        for _ in 0 .. *times {
+                            for item in &list.items {
+                                output.push(item.clone());
+                            }
+                        }
+
+                        return self.stack.push(UniLValue::Object(Rc::new(RefCell::new(List::from(output).into()))));
+                    }
+                }
+            }
+            UniLValue::Null => ()
         }
 
         self.exception = Some(UniLValue::String(format!(
@@ -465,14 +486,17 @@ macro_rules! load_name {
 impl UniVM {
     const TIME_SLICE_INSTRUCTIONS: usize = 1024;
 
-    pub fn new() -> Self {
+    fn load_globals() -> Environment {
         log!(TraceLogLevel::LOG_INFO, "Loading API layers");
         let mut globals = Environment::new();
         api_layers::define(&mut globals);
         log!(TraceLogLevel::LOG_INFO, "{} globals loaded", globals.len());
+        globals
+    }
 
+    pub fn new() -> Self {
         Self {
-            globals: Rc::new(RefCell::new(globals)),
+            globals: Rc::new(RefCell::new(Self::load_globals())),
             bytecode: OnceCell::new(),
             delegate_call: false,
             return_values: HashMap::default(),
@@ -482,9 +506,16 @@ impl UniVM {
         }
     }
 
+    pub fn reload_globals(&mut self) {
+        self.globals.replace(Self::load_globals());
+    }
+
     pub fn reset(&mut self) {
         VM_TASKS.with_borrow_mut(|tasks| tasks.clear());
         self.return_values.clear();
+        self.scheduled_tasks.clear();
+        self.started_tasks.clear();
+        self.delegate_call = false;        
         self.task_id = 0;
     }
 
@@ -500,8 +531,7 @@ impl UniVM {
     }
 
     pub fn set_bytecode(&mut self, bytecode: Bytecode) {
-        self.bytecode.take();
-        self.bytecode.set(bytecode).unwrap();
+        let _ = self.bytecode.set(bytecode);
     }
 
     pub fn create_exception(&mut self, value: UniLValue) -> ExecutionInterrupt {
@@ -540,16 +570,6 @@ impl UniV {
     
                         let position = get_expect!(self.vm.bytecode).positions.get(task.ip as usize)
                             .expect("VM instruction pointer tried to access out of bounds position").clone();
-                        
-                        // TODO
-                        // println!("{:?}", self.vm.return_values);
-                        // println!("{:?}", task.stack);
-                        // println!("{:?}", task.call_stack);
-                        // println!("{:?}", task.exception_handlers_stack);
-                        // print!("{}", get_expect!(self.vm.bytecode).disassemble_one(task.ip));
-                        // println!("{}", traceback_part(&position.source, &position.filename, position.start, position.end.saturating_sub(position.start), position.line));
-                        // println!("--------");
-                        // task.environment.borrow().print_vars(0, 0);
 
                         task.pos_stack.push(position);
             

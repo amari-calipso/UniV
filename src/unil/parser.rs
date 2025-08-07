@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use crate::{ast_error, token_error, unil::{
-    ast::{Expression, NamedExpr, LiteralKind, SwitchCase},
+use crate::{error, unil::{
+    ast::{Expression, LiteralKind, NamedExpr, SwitchCase},
     tokens::{Token, TokenType}
 }};
 
@@ -156,7 +156,7 @@ impl Parser {
             Some(self.advance())
         } else {
             let tok = self.peek();
-            token_error!(self, tok, msg);
+            error!(self, tok, msg);
             None
         }
     }
@@ -173,7 +173,7 @@ impl Parser {
                         self.previous().clone()
                     } else {
                         let tok = self.peek();
-                        token_error!(self, tok, "Expecting field name");
+                        error!(self, tok, "Expecting field name");
                         return None;
                     }
                 };
@@ -251,7 +251,7 @@ impl Parser {
         match_literal!(self, String);
 
         let last = self.peek();
-        token_error!(self, last, "Expecting expression");
+        error!(self, last, "Expecting expression");
 
         None
     }
@@ -310,7 +310,7 @@ impl Parser {
             let op = self.previous().clone();
 
             if !expr.is_valid_assignment_target() {
-                ast_error!(self, expr, "Invalid assignment target");
+                error!(self, expr, "Invalid assignment target");
             }
 
             return Some(Expression::Unary {
@@ -332,7 +332,7 @@ impl Parser {
             let right = self.prefix_unary()?;
 
             if matches!(op.type_, TokenType::PlusPlus | TokenType::MinusMinus) && !right.is_valid_assignment_target() {
-                ast_error!(self, right, "Invalid assignment target");
+                error!(self, right, "Invalid assignment target");
             }
 
             return Some(Expression::Unary {
@@ -393,12 +393,12 @@ impl Parser {
             let value = self.assignment()?;
 
             if !expr.is_valid_assignment_target() {
-                ast_error!(self, expr, "Invalid assignment target");
+                error!(self, expr, "Invalid assignment target");
             }
 
             if let Some(type_) = &type_ {
                 if !matches!(op.type_, TokenType::Walrus) {
-                    ast_error!(self, type_, "Can only use type notation with ':=' operator");
+                    error!(self, type_, "Can only use type notation with ':=' operator");
                 }
             }
 
@@ -445,7 +445,7 @@ impl Parser {
             self.scoped_block(tok)
         } else {
             let tok = self.peek();
-            token_error!(self, tok, msg);
+            error!(self, tok, msg);
             None
         }
     }

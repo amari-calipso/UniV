@@ -83,7 +83,7 @@ class WikiSort:
         else:
             this.cache = None
         if rot is None:
-            this.internalRotate = UniV_getUserRotation("Select rotation algorithm (default: Triple Reversal)").indexed
+            this.internalRotate = UniV_getUserRotation("Select rotation algorithm", "Triple Reversal").indexed
         else:
             this.internalRotate = sortingVisualizer.getRotationByName(rot).indexed
 

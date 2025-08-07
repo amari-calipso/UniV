@@ -4,7 +4,7 @@
 UniV aims to be the most feature-rich, easy to use, and compatible sorting visualization software, all while being one of the fastest and most capable.
 
 # What does "UniV" mean?
-"UniV" stands for "unifying visualizer" or "universal visualizer". It's a wordplay on ArrayV, the popular sorting visualization program (don't worry, i was involved in its development, so i'm allowed to take inspiration ;3). UniV is "unifying" and "universal", because it's the only currently available visualization software that is able to implement compatibility layers with different programming languages and other visualization software. This means that it's virtually able to run algorithms written in every language, as long as a compatibility layer is written for it. UniV is also the unification of previous experiences in developing similar software, like the old "SortTheater" project, ArrayV, and my [opal Sorting Visualizer, "oSV" for short](#https://github.com/amari-calipso/sorting-visualizer), the last one being the greatest ground for experimenting with techniques and approaches. The architecture of UniV's graphics and sound is heavily inspired and influenced by it, so check it out!
+"UniV" stands for "unifying visualizer" or "universal visualizer". It's a wordplay on ArrayV, the popular sorting visualization program (don't worry, i was involved in its development, so i'm allowed to take inspiration ;3). UniV is "unifying" and "universal", because it's the only currently available visualization software that is able to implement compatibility layers with different programming languages and other visualization software. This means that it's virtually able to run algorithms written in every language, as long as a compatibility layer is written for it. UniV is also the unification of previous experiences in developing similar software, like the old "SortTheater" project, ArrayV, and my [opal Sorting Visualizer, "oSV" for short](https://github.com/amari-calipso/sorting-visualizer), the last one being the greatest ground for experimenting with techniques and approaches. The architecture of UniV's graphics and sound is heavily inspired and influenced by it, so check it out!
 
 # Why UniV?
 - UniV is **feature-rich**. It's the most advanced sorting visualization software currently available. It allows for detailed animations with plenty of encodable information, it provides great user interaction, and all of the features from modern visualization programs;
@@ -12,18 +12,18 @@ UniV aims to be the most feature-rich, easy to use, and compatible sorting visua
 - UniV is **convenient**. The user interface is designed to be as intuitive as possible, without shoving too many things in front of the user. It has a bunch of quality of life features to make experimentation easier and visualization more enjoyable, and it even provides [an extremely simple custom scripting language for automating visualizations](#the-univ-automation-language), perfect for creating videos without needing to interact with the program, or for creating complex shuffles by combining existing ones!
 - UniV is **universal**. As mentioned before, you can run a lot of things on UniV, as long as it has a translation layer for your language and API;
 - UniV is **modular**. The architecture is built in such a way that it's easy to add new components to UniV. Want a new visual style? or a new sound system perhaps? a new algorithm? check how easy it is to [add it yourself](#how-to-add-an-algorithm)!
-- UniV is **great for creating videos**. Thanks to its integration with [ffmpeg](https://ffmpeg.org/), UniV is able to produce high quality videos without needing any recording software, and without any frame drops, as the video is generated from scratch instead of it being a screen recording;
+- UniV is **great for creating videos**. Thanks to its integration with [ffmpeg](https://ffmpeg.org/), UniV is able to produce high quality videos without needing any recording software, and without any frame drops, as the video is generated from scratch instead of it being a screen recording. Render mode even provides an option to automatically generate timestamps for your videos, that way it's very easy to add them to the description of your video in platforms such as YouTube;
 - UniV loves **open source**. Contributions and forks are more than welcome, and UniV attempts to be as open and accessible as possible for developers.
 
 # Run or build
-Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) installed on your machine.
+Note that using render mode requires having [ffmpeg](https://ffmpeg.org/) installed on your machine. If it's not installed and you enable render mode, UniV will ask you if you want to download it automatically.
 
-Jump to [releases]() if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
+Jump to [releases](https://github.com/amari-calipso/UniV/releases) if you just want to use the program! If you're not planning to play around with the algorithms' code, or your machine is not particularly fast, you can download the "lite" version, for a version that's stripped out of the compiler capabilities, hence reducing the hardware requirements significantly.
 
 If you're running or building from source, make sure that your machine has installed:
-    - [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
-    - [CMake](https://cmake.org/) (note that release candidate versions, marked as "rc", might not work);
-    - libclang (if you're on Windows, you can download [LLVM](https://releases.llvm.org/download.html), which contains libclang);
+- [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
+- [CMake](https://cmake.org/) (note that release candidate versions, marked as "rc", might not work);
+- libclang (if you're on Windows, you can download [LLVM](https://releases.llvm.org/download.html), which contains libclang);
 
 To run or build from source, clone the repository first, then you have two options:
 - To run directly, just use `cargo run`.
@@ -31,7 +31,7 @@ To run or build from source, clone the repository first, then you have two optio
     - If building a full release:
         - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release`
         - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release`
-        - If building a "lite" release:
+    - If building a "lite" release:
         - Unix-like: `rustc dev_util.rs -o dev_util && ./dev_util --release-lite`
         - Windows: `rustc dev_util.rs -o dev_util.exe && dev_util --release-lite`
 
@@ -53,7 +53,6 @@ To run or build from source, clone the repository first, then you have two optio
     - [Python](#python)
         - [What is supported and what is not supported](#what-is-supported-and-what-is-not-supported)
         - [API support](#api-support)
-        - [How to add an algorithm](#how-to-add-an-algorithm-1)
     - [Java](#java)
 - [Adding visual styles](#adding-visual-styles)
 - [Adding sound engines](#adding-sound-engines)
@@ -149,6 +148,24 @@ set speed BUBBLE_SORT_SPEED
 run sort "Bubble Sort" in "Exchange Sorts"
 ```
 
+You can generate timestamps for relevant moments of your automation, that will later be saved to a file if the user is using render mode:
+```
+run distribution "Linear" with length 256
+timestamp "First we shuffle..."
+run shuffle "Random"
+set speed 80
+timestamp "... Then we sort!"
+run sort "Bubble Sort" in "Exchange Sorts"
+```
+
+Timestamps can also be generated automatically by UniV, without specifying a message.
+```
+run distribution "Linear" with length 256
+run shuffle "Random" with timestamp // will output HH:MM:SS - Shuffle: Random
+set speed 80
+run sort "Bubble Sort" in "Exchange Sorts" with timestamp // will output HH:MM:SS - Bubble Sort
+```
+
 You can also `describe` your automation, to show a summary of what the automation does in UniV's GUI
 ```
 describe "Runs Bubble Sort on 256 random items on the Bar Graph visual style"
@@ -198,7 +215,7 @@ b: Int := 0; // You can manually specify types
 
 c: any := 0; // If the specified type is "any", the variable will be dynamically typed
 
-// Variables can be reassigned\
+// Variables can be reassigned
 a = 1; 
 c = "Hello";
 ```
@@ -396,12 +413,14 @@ log(c); // Undefined variable
 The most important functions in the standard library are:
 - `swap(List, Int, Int) Null`: swaps two indices in an array;
 - `List_push(List, any) Null`: pushes a value to the end of a List;
+- `List_pop(List) any`: Pops the last value from a list. Returns null if the list is empty, otherwise it returns the value that was removed;
+- `List_removeIdx(List) any`: Removes a value at a given index from a list. Returns null if the list is empty, otherwise it returns the value that was removed;
 - `List_clear(List) Null`: removes all elements in a List;
 - `List_min(List) any`: returns the minimum item in a List;
 - `List_max(List) any`: returns the maximum item in a List;
 - `min(any, any) any`: returns the minimum of two values;
 - `max(any, any) any`: returns the maximum of two values;
-- `log(any) Null`: prints the given object on the screen;
+- `log(any) Null`: prints the given object on the console;
 - `stringify(any) String`: turns the given object into a string;
 - `stringifyType(any) String`: returns a string containing the name of the value type;
 - `parseInt(String) Int`: parses an Int from a String. Throws an exception if there is no parsable Int in the String;
@@ -459,8 +478,8 @@ UniL also provides access to functions to interact with the visualizer
 - `UniV_getRotation(String) Object`: gets a shared rotation algorithm given its name. Throws an exception if the algorithm doesn't exist;
 
 #### User input
-- `UniV_getUserPivotSelection(String) Callable`: like `UniV_getPivotSelection`, but it asks the user to select a pivot selection algorithm. The parameter is a message to display to the user;
-- `UniV_getUserRotation(String) Object`: like `UniV_getRotation`, but it asks the user to select a rotation algorithm. The parameter is a message to display to the user;
+- `UniV_getUserPivotSelection(String, String | Null) Callable`: like `UniV_getPivotSelection`, but it asks the user to select a pivot selection algorithm. The first arameter is a message to display to the user, the second one is the default pivot selection (if any);
+- `UniV_getUserRotation(String, String | Null) Object`: like `UniV_getRotation`, but it asks the user to select a rotation algorithm. The first parameter is a message to display to the user, the second one is the default rotation (if any);
 - `UniV_getUserSelection(List, String) Int`: asks the user to select between a list of items. Returns the selection index. The string parameter is a message to display to the user;
 - `UniV_getUserInput(message: String, default: String, convert: Callable) any`: asks the user to insert some text. The text is then passed to the `convert` callable, to convert it to the desired type. If `convert` fails, the user will be prompted to retry. Returns the converted output. If no conversion is needed, you can pass `asAny`, while if you need to get an Int, use `parseInt`;
 - `UniV_popup(String) Null`: shows a popup with a given message to the user; 
@@ -589,6 +608,11 @@ The following Python constructs are not currently supported:
 - Non-string dictionary keys
 #### API support
 Visualizer interaction in the Python layer usually happens using the [oSV API](https://github.com/amari-calipso/sorting-visualizer), but interacting with the [UniV API](#visualizer-interaction) directly also works.
+
+You can get IDE support for the UniV API by importing UniV's headers, though this is not necessary. If your file is in the `algos` folder, adding this line on top of your file is sufficient:
+```py
+from ...headers.UniV import *
+```
 ### Java
 Java support is in the works, stay tuned!
 ## Adding visual styles

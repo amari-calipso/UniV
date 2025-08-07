@@ -18,7 +18,7 @@ class LithiumSort:
         rl = b-m
         ll = m-a
         bl = this.bufLen
-        min_ = bl if rl != ll and min([bl, rl, ll]) > this.SMALL_MERGE else 1
+        min_ = bl if rl != ll and min(bl, rl, ll) > this.SMALL_MERGE else 1
         while (rl > min_ and ll > min_) or (rl < this.SMALL_MERGE and rl > 1 and ll < this.SMALL_MERGE and ll > 1):
             if rl < ll:
                 blockSwap(array, a, m, rl)

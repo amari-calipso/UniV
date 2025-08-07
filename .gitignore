@@ -2,6 +2,7 @@
 /target/
 /dist/
 /resources/gen/
+/publish/
 
 # generated module files
 /src/visuals/mod.rs
@@ -19,7 +20,11 @@ algos.unib
 dev_util
 dev_util.exe
 
+# third-party languages headers
+/headers/
+
 # render output
 output.mp4
 tmp.mp4
 tmp.wav
+timestamps.txt

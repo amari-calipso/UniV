@@ -1,5 +1,9 @@
-// removes warnings when compiling lite version
+// removes warnings when compiling lite or dev versions
 #![cfg_attr(feature = "lite", allow(unused))]
+#![cfg_attr(feature = "dev", allow(unused))]
+
+#[cfg(not(any(feature = "full", feature = "lite", feature = "dev")))]
+compile_error!("UniV must be compiled with one of these features: \"full\", \"lite\", \"dev\" (\"full\" is default)");
 
 use std::{cell::{OnceCell, RefCell}, cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, env, fmt::Debug, fs::{self, create_dir, File}, io::{Error, ErrorKind, Read, Write}, panic, path::PathBuf, process::{Child, Command, Stdio}, rc::Rc, sync::{atomic::{self, AtomicBool}, Arc, OnceLock}, thread, time::{Duration, Instant}};
 use algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort};
@@ -23,7 +27,8 @@ use highlights::HighlightInfo;
 use value::{Value, VerifyValue};
 use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
-use bincode::encode_into_std_write;
+use utils::report_errors;
+use compiler::type_system::UniLType;
 
 #[cfg(feature = "lite")]
 use bincode::decode_from_slice;
@@ -97,9 +102,13 @@ mod gui;
 mod heatmap;
 mod api_layers;
 mod automation;
+mod ffmpeg;
 
-#[cfg(not(feature = "lite"))] 
+#[cfg(not(feature = "lite"))]
 mod language_layers;
+
+#[cfg(feature = "dev")]
+mod dev;
 
 enum ArrayState {
     Unsorted,
@@ -138,10 +147,14 @@ struct Render {
 
     pub frame_duration: f64,
 
+    pub recording_duration: Duration,
+    pub timestamp_file: OnceCell<File>,
+
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
 
-    pub ffmpeg: OnceCell<FFMpeg>
+    pub ffmpeg: OnceCell<FFMpeg>,
+    pub ffmpeg_executable: PathBuf
 }
 
 struct Audio {
@@ -206,7 +219,7 @@ pub struct UniV {
     shared:     Shared,
     gui:        Gui,
     autovalues: VecDeque<UniLValue>,
-    
+
     /// Determines whether the values given by the user to the GUI API should be stored for automation
     store_user_values: bool,
     /// Stores values given by the user to the GUI API for automation purposes if `store_user_values` is set to `true`
@@ -358,7 +371,7 @@ impl Shared {
 
             heatmap: HeatMap::new(),
             aux_heatmap: HeatMap::new(),
-            
+
             fps: REFERENCE_FRAMERATE,
             reverb: false
         }
@@ -370,9 +383,12 @@ impl Render {
         Render {
             active: false,
             frame_duration: 0.0,
+            recording_duration: Duration::ZERO,
+            timestamp_file: OnceCell::new(),
             speed_cnt: 0,
             speed_cnt_max: 1,
-            ffmpeg: OnceCell::new()
+            ffmpeg: OnceCell::new(),
+            ffmpeg_executable: PathBuf::from("ffmpeg")
         }
     }
 }
@@ -455,8 +471,10 @@ macro_rules! render_stats {
             if $slf.settings.internal_info {
                 let target_fps;
                 let dropped_frames;
+                let recording_duration;
                 if $slf.render.active {
                     target_fps = "None".into();
+                    recording_duration = utils::duration_to_hms(&$slf.render.recording_duration);
                     dropped_frames = (
                         1.0 - min(
                             OrderedFloat($slf.settings.render_fps as f64),
@@ -465,6 +483,7 @@ macro_rules! render_stats {
                 } else {
                     target_fps = $slf.target_fps.to_string();
                     dropped_frames = (1.0 - $fps as f64 / $slf.target_fps as f64) * 100.0;
+                    recording_duration = "None".into();
                 }
 
                 utils::gfx::draw_outline_text_right(
@@ -474,12 +493,14 @@ macro_rules! render_stats {
                             "Target FPS: {}\n",
                             "Dropped frames: {:.2}%\n",
                             "Frame: {}\n",
+                            "Recording duration: {}\n",
                             "Current delay: {:.2} ms\n",
                         ),
                         $fps,
                         target_fps,
                         dropped_frames,
                         $slf.frame_n,
+                        recording_duration,
                         $slf.tmp_sleep * 1000.0,
                     ).as_ref(),
                     Vector2 { x: $draw.get_screen_width() as f32 - STATS_POS.x, y: STATS_POS.y },
@@ -500,7 +521,7 @@ macro_rules! adapt_idx {
                     if array.as_ptr() as *const AnyObject == $aux_id {
                         break 'output offs + $idx;
                     }
-        
+
                     let borrowed = array.borrow();
                     offs += expect_list!(borrowed).items.len();
                 }
@@ -621,7 +642,7 @@ impl UniV {
 
     pub fn pop_autovalue(&mut self) -> UniLValue {
         self.autovalues.pop_front().unwrap_or(UniLValue::Null)
-    } 
+    }
 
     pub fn reset_autovalues(&mut self) {
         self.autovalues.clear();
@@ -813,9 +834,9 @@ impl UniV {
 
     fn should_render_rendered(&mut self) -> bool {
         // random variance is added so that highlights are evenly shown.
-        // for instance, if some highlights are shown on odd frames only, 
+        // for instance, if some highlights are shown on odd frames only,
         // and the target fps is double the render fps, those highlights might never be shown
-        if self.render.speed_cnt + 1 < self.render.speed_cnt_max && self.rng.random_range(0..=1) == 1 {
+        if self.render.speed_cnt + self.rng.random_range(0..=1) < self.render.speed_cnt_max {
             self.render.speed_cnt += 1;
             self.frame_n = self.frame_n.wrapping_add(1);
             false
@@ -918,6 +939,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
+        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         Ok(())
@@ -941,6 +963,11 @@ impl UniV {
         self.set_hl_buf.insert(HighlightInfo::new(0, None, None, true, false));
 
         let mut color = SORTED_COLOR;
+        
+        if self.shared.array.len() != self.shared.verify_array.len() {
+            color = UNSORTED_COLOR;
+        }
+
         for i in 0 .. self.shared.array.len() {
             if self.shared.array[i].value != self.shared.verify_array[i].value {
                 color = UNSORTED_COLOR;
@@ -1321,11 +1348,11 @@ impl UniV {
                             max = *value;
                         } else {
                             return Err(self.vm.create_exception(UniLValue::String(format!(
-                                "Item of type '{}' (at index 0) is not allowed in visualized auxiliary arrays", 
+                                "Item of type '{}' (at index 0) is not allowed in visualized auxiliary arrays",
                                 list.items[0].stringify_type()
                             ).into())));
                         }
-    
+
                         for i in 1 .. list.items.len() {
                             if let UniLValue::Value { value, .. } = &list.items[i] {
                                 if *value > max {
@@ -1333,12 +1360,12 @@ impl UniV {
                                 }
                             } else {
                                 return Err(self.vm.create_exception(UniLValue::String(format!(
-                                    "Item of type '{}' (at index {}) is not allowed in visualized auxiliary arrays", 
+                                    "Item of type '{}' (at index {}) is not allowed in visualized auxiliary arrays",
                                     list.items[i].stringify_type(), i
                                 ).into())));
                             }
                         }
-    
+
                         let mlt = {
                             if max == 0 || self.shared.aux_max == 0 {
                                 1.0
@@ -1346,19 +1373,19 @@ impl UniV {
                                 self.shared.aux_max as f64 / (max as f64 * 1.1)
                             }
                         };
-    
+
                         for orig in &list.items {
                             if let UniLValue::Value { value, idx } = orig {
-                                self.shared.aux.push(Value { 
+                                self.shared.aux.push(Value {
                                     value: {
                                         if *value <= 0 {
                                             0
                                         } else {
                                             (*value as f64 * mlt) as i64
-                                        }                                
-                                    }, 
-                                    idx: *idx, 
-                                    aux: Some(array.as_ptr() as *const AnyObject) 
+                                        }
+                                    },
+                                    idx: *idx,
+                                    aux: Some(array.as_ptr() as *const AnyObject)
                                 });
                             } else {
                                 unreachable!()
@@ -1367,16 +1394,16 @@ impl UniV {
                     } else {
                         for orig in &list.items {
                             if let UniLValue::Value { value, idx } = orig {
-                                self.shared.aux.push(Value { 
+                                self.shared.aux.push(Value {
                                     value: {
                                         if *value <= 0 {
                                             0
                                         } else {
                                             *value
-                                        }                                
-                                    }, 
-                                    idx: *idx, 
-                                    aux: Some(array.as_ptr() as *const AnyObject) 
+                                        }
+                                    },
+                                    idx: *idx,
+                                    aux: Some(array.as_ptr() as *const AnyObject)
                                 });
                             } else {
                                 unreachable!()
@@ -1385,14 +1412,14 @@ impl UniV {
                     }
                 }
             }
-    
+
             if self.shared.aux.len() == 0 {
-                self.shared.aux.push(Value { 
-                    value: 0, idx: 0, 
+                self.shared.aux.push(Value {
+                    value: 0, idx: 0,
                     aux: Some(self.aux_arrays.first().unwrap().as_ptr() as *const AnyObject)
                 });
             }
-            
+
             let old_max = self.shared.aux_max;
             self.get_aux_max();
 
@@ -1465,7 +1492,7 @@ impl UniV {
     // TODO: check if this is correct
     pub fn delay(&mut self, amt_ms: f64) {
         self.tmp_sleep = max(OrderedFloat(0.0), OrderedFloat(amt_ms / (1000.0 * self.get_speed()))).0;
-    }   
+    }
 
     pub fn reset_speed(&mut self) {
         self.target_fps = REFERENCE_FRAMERATE;
@@ -1491,7 +1518,7 @@ impl UniV {
 
         if let Some(idx) = self.aux_ids.remove(&(aux.as_ptr() as *const AnyObject)) {
             self.aux_arrays.remove(idx);
-            
+
             if idx != self.aux_arrays.len() {
                 self.refresh_aux_ids();
             }
@@ -1518,7 +1545,7 @@ impl UniV {
                 Rc::from("Cannot add main array to auxiliaries")
             )));
         }
-        
+
         if self.aux_ids.contains_key(&aux_id) {
             return Err(self.vm.create_exception(UniLValue::String(
                 Rc::from("Cannot add same auxiliary array to visualization multiple times")
@@ -1612,8 +1639,8 @@ impl UniV {
 
             // if the sound is a long one (suggesting a longer frame due to a temporary sleep),
             // play it ignoring the frametime limit
-            if sound_duration <= REALTIME_UNIT_SAMPLE_DURATION && 
-                self.sound_timestamp.elapsed().as_secs_f64() < REFERENCE_FRAMETIME 
+            if sound_duration <= REALTIME_UNIT_SAMPLE_DURATION &&
+                self.sound_timestamp.elapsed().as_secs_f64() < REFERENCE_FRAMETIME
             {
                 return;
             }
@@ -1632,7 +1659,7 @@ impl UniV {
 
     fn clear_highlights_if_precise(&mut self) {
         if self.settings.precise_highlights {
-            self.highlights.clear(); 
+            self.highlights.clear();
         }
     }
 
@@ -1654,12 +1681,26 @@ impl UniV {
         let mut render_each = max(1, (frame_time * self.target_fps as f64).round() as u64);
 
         // if the amount of frames to skip gets too high, the program will get stuck
+        // so find a lower amount of frames to skip, in a "best effort" approach
         if render_each != 1 && render_each as f64 / MAX_FRAMERATE >= RENDER_EACH_MAX_SECS {
-            render_each = 1;
+            let mut a = 1;
+            let mut b = render_each;
+
+            while a < b {
+                let m = a + (b - a) / 2;
+
+                if m as f64 / MAX_FRAMERATE >= RENDER_EACH_MAX_SECS {
+                    b = m;
+                } else {
+                    a = m + 1;
+                }
+            }
+
+            render_each = a;
         }
 
         if self.frame_n % render_each == 0 {
-            true 
+            true
         } else {
             self.clear_highlights_if_precise();
             self.frame_n = self.frame_n.wrapping_add(1);
@@ -1734,7 +1775,7 @@ impl UniV {
     fn init_ffmpeg(&mut self, frame: &raylib::ffi::Image) -> Result<(), ExecutionInterrupt> {
         self.render.ffmpeg.set(FFMpeg {
             video: {
-                Command::new("ffmpeg")
+                Command::new(&self.render.ffmpeg_executable)
                     .args([
                         "-hwaccel", "auto",
 
@@ -1759,7 +1800,7 @@ impl UniV {
                     .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
             },
             audio: {
-                Command::new("ffmpeg")
+                Command::new(&self.render.ffmpeg_executable)
                     .args([
                         "-hwaccel", "auto",
 
@@ -1898,6 +1939,7 @@ impl UniV {
         get_expect_mut!(self.rl_handle).set_trace_log(LOG_LEVEL);
 
         self.render.speed_cnt += 1;
+        self.render.recording_duration += Duration::from_secs_f64(frame_duration);
         self.heatmap_cnt += 1;
         self.frame_n = self.frame_n.wrapping_add(1);
         self.highlights.clear();
@@ -1974,6 +2016,18 @@ impl UniV {
         self.shared.reverb = self.settings.reverb;
     }
 
+    fn try_load_current_profile(&mut self) {
+        log!(TraceLogLevel::LOG_INFO, "Loading render profile");
+
+        match Profile::load(&self.settings.profile) {
+            Ok(profile) => self.profile = profile,
+            Err(e) => {
+                log!(TraceLogLevel::LOG_ERROR, "Could not load chosen profile");
+                log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+            }
+        }
+    }
+
     fn load_settings(&mut self, first: bool) {
         log!(TraceLogLevel::LOG_INFO, "Loading settings");
         match UniVSettings::load() {
@@ -2007,16 +2061,7 @@ impl UniV {
         }
 
         self.sync_reverb();
-
-        log!(TraceLogLevel::LOG_INFO, "Loading render profile");
-        match Profile::load(&self.settings.profile) {
-            Ok(profile) => self.profile = profile,
-            Err(e) => {
-                log!(TraceLogLevel::LOG_ERROR, "Could not load chosen profile");
-                log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
-                log!(TraceLogLevel::LOG_WARNING, "Using default profile");
-            }
-        }
+        self.try_load_current_profile();
     }
 
     fn load_algo_folder(&mut self, folder: &str) -> Result<Vec<Expression>, Vec<Error>> {
@@ -2125,9 +2170,9 @@ impl UniV {
                         }
 
                         let automation = {
-                            if let Some(automation) = 
+                            if let Some(automation) =
                                 univ.try_load_automation(&automations[univ.gui.automation_selection.index].filename)
-                                    .map_err(|e| univ.automation_interpreter.create_exception(e.to_string().into()))? 
+                                    .map_err(|e| univ.automation_interpreter.create_exception(e.to_string().into()))?
                             {
                                 automation
                             } else {
@@ -2137,17 +2182,17 @@ impl UniV {
                             }
                         };
 
-                        univ.shuffle_automation.set(automation).unwrap(); 
+                        univ.shuffle_automation.set(automation).unwrap();
                     }
 
                     let automation = get_expect!(univ.shuffle_automation);
                     univ.execute_automation(
-                        Rc::clone(&automation.source), 
+                        Rc::clone(&automation.source),
                         Rc::clone(&automation.filename)
                     )?;
 
                     Ok(UniLValue::Null)
-                }), 
+                }),
                 1
             ).into()
         };
@@ -2156,7 +2201,7 @@ impl UniV {
     }
 
     #[cfg(not(feature = "lite"))]
-    fn compile_algos(&mut self, errors: &mut Vec<Error>) -> Option<Bytecode> {
+    fn get_algos_ast(&mut self, errors: &mut Vec<Error>) -> Vec<Expression> {
         log!(TraceLogLevel::LOG_INFO, "Loading algorithms");
 
         let mut toplevel_ast = {
@@ -2176,8 +2221,35 @@ impl UniV {
             }
         }
 
-        match compiler::compile(&toplevel_ast, &self.vm.globals.borrow()) {
-            Ok(bytecode) => Some(bytecode),
+        toplevel_ast
+    }
+
+    #[cfg(not(feature = "lite"))]
+    pub fn generate_headers(globals: &HashMap<Rc<str>, UniLType>) -> Result<(), Error> {
+        let headers = program_dir!().join("headers");
+        if !headers.exists() {
+            fs::create_dir(&headers)?;
+        }
+        
+        language_layers::generate_headers(globals)?;
+        Ok(())
+    }
+
+    #[cfg(not(feature = "lite"))]
+    fn compile_algos(&mut self, errors: &mut Vec<Error>, headers: bool) -> Option<Bytecode> {
+        let mut toplevel_ast = self.get_algos_ast(errors);
+        unil::swap_recognition::process(&mut toplevel_ast);
+
+        match compiler::compile_and_get_globals(&toplevel_ast, &self.vm.globals.borrow()) {
+            Ok((bytecode, globals)) => {
+                if headers {
+                    if let Err(e) = Self::generate_headers(globals.borrow().get_locals()) {
+                        errors.push(e);
+                    }
+                }
+
+                Some(bytecode)
+            }
             Err(err) => {
                 errors.extend(err.into_iter().map(|x| Error::other(x)));
                 None
@@ -2189,7 +2261,7 @@ impl UniV {
         let mut errors = Vec::new();
 
         #[cfg(not(feature = "lite"))]
-        let bytecode = self.compile_algos(&mut errors);
+        let bytecode = self.compile_algos(&mut errors, true);
 
         #[cfg(feature = "lite")]
         let bytecode: Option<Bytecode> = Some(
@@ -2202,7 +2274,7 @@ impl UniV {
             let mut task = Task::new(0, &Rc::clone(&self.vm.globals));
             task.started = true;
             self.vm.schedule(task);
-            
+
             if let Err(err) = self.execute() {
                 match err {
                     ExecutionInterrupt::Quit => return Ok(true),
@@ -2213,7 +2285,7 @@ impl UniV {
                 }
             }
         }
-        
+
         let sort_amt: usize = self.sorts.values().map(|x| x.len()).sum();
         self.categories.sort();
 
@@ -2229,8 +2301,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_sorts.take();
-                    self.run_all_sorts.set(automation).unwrap();
+                    let _ = self.run_all_sorts.set(automation);
                 }
             }
         }
@@ -2239,8 +2310,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    self.run_all_shuffles.take();
-                    self.run_all_shuffles.set(automation).unwrap();
+                    let _ = self.run_all_shuffles.set(automation);
                 }
             }
         }
@@ -2268,7 +2338,7 @@ impl UniV {
 
     fn init_visuals(&mut self) -> Result<(), ExecutionInterrupt> {
         log!(TraceLogLevel::LOG_INFO, "Initializing visuals");
-        
+
         let rl = get_expect_mut!(self.rl_handle);
         let thread = get_expect!(self.rl_thread);
         for visual in self.visuals.iter_mut() {
@@ -2288,7 +2358,7 @@ impl UniV {
 
             let _ = rl.begin_drawing(get_expect!(self.rl_thread)); // without this, get_screen_height() and get_screen_width() return the old value
         }
-
+        
         self.compute_font_size();
         self.init_gui();
         self.loading_message("Preparing...")?;
@@ -2301,11 +2371,10 @@ impl UniV {
             let width = rl.get_screen_width() as u32;
             let height = rl.get_screen_height() as u32;
 
-            self.render_texture.take();
-            self.render_texture.set(
+            let _ = self.render_texture.set(
                 rl.load_render_texture(get_expect!(self.rl_thread), width, height)
                     .expect("Could not load render texture")
-            ).unwrap();
+            );
         }
 
         log!(TraceLogLevel::LOG_INFO, "Loading font");
@@ -2329,7 +2398,7 @@ impl UniV {
             }
         }
 
-        
+
         self.init_visuals()?;
         Ok(())
     }
@@ -2361,7 +2430,7 @@ impl UniV {
         let (handle, thread) = raylib::init()
             .size(self.settings.resolution[0] as i32, self.settings.resolution[1] as i32)
             .title(format!(
-                "UniV {}v{}", 
+                "UniV {}v{}",
                 if cfg!(feature = "lite") { "lite " } else { "" },
                 VERSION
             ).as_str())
@@ -2449,15 +2518,7 @@ impl UniV {
                 }
             }
             Err(errors) => {
-                let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-                for error in errors {
-                    error_buf.push('\n');
-                    error_buf.push_str(&error.to_string());
-                }
-
-                log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-
+                let error_buf = report_errors("Something went wrong while loading algorithms", &errors);
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", &error_buf).unwrap();
                 if self.run_gui().is_err() {
@@ -2473,6 +2534,7 @@ impl UniV {
         self.loading_message("Unloading algorithms...")?;
 
         self.vm.reset();
+        self.vm.reload_globals();
         self.distributions.clear();
         self.shuffles.clear();
         self.sorts.clear();
@@ -2489,15 +2551,7 @@ impl UniV {
                 }
             }
             Err(errors) => {
-                let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-                for error in errors {
-                    error_buf.push('\n');
-                    error_buf.push_str(&error.to_string());
-                }
-
-                log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-
+                let error_buf = report_errors("Something went wrong while loading algorithms", &errors);
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", &error_buf).unwrap();
                 self.run_gui()?;
@@ -2547,9 +2601,10 @@ impl UniV {
 
             let thread_running = Arc::new(AtomicBool::new(true));
             let local_running = Arc::clone(&thread_running);
+            let executable = self.render.ffmpeg_executable.clone();
 
             let handle = std::thread::spawn(move || {
-                let res = Command::new("ffmpeg")
+                let res = Command::new(executable)
                     .args([
                         "-i", "tmp.mp4",
                         "-i", "tmp.wav",
@@ -2632,7 +2687,7 @@ impl UniV {
 
         self.set_speed(speed)
             .map_err(|e| self.vm.create_exception(UniLValue::String(e)))?;
-        
+
         let category = Rc::clone(&self.categories[category_id as usize]);
         self.run_sort(&category, &Rc::clone(&self.gui.sorts[&category][sort_id as usize]))
     }
@@ -2721,7 +2776,7 @@ impl UniV {
                 }
             }
         }
-        
+
         if let Err(e) = self.run_sort(&category, &sort) {
             if !all_sorts {
                 self.user_values.clear();
@@ -2743,7 +2798,7 @@ impl UniV {
         length: usize, unique: usize, speed: f64, all_sorts: bool
     ) -> Result<(), ExecutionInterrupt> {
         if let Err(e) = self.wrapped_runall_sequence(
-            distribution_id, shuffle_id, category_id, sort_id, 
+            distribution_id, shuffle_id, category_id, sort_id,
             length, unique, speed, all_sorts
         ) {
             self.reset_autovalues();
@@ -2756,6 +2811,7 @@ impl UniV {
                 self.gui.build_fn = Gui::popup;
                 self.gui.popup.set("Error", formatted.as_str()).unwrap();
                 self.run_gui()?;
+                self.reset();
             } else if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                 return Err(e); // propagate stopalgorithm so that it stops the entire sequence
             }
@@ -2768,6 +2824,7 @@ impl UniV {
         self.keep_empty_frames = false;
         self.reset_speed();
         self.marks.clear();
+        self.highlights.clear();
         self.reset_aux();
         self.reset_heatmaps();
     }
@@ -2795,33 +2852,33 @@ impl UniV {
                         errors.push(e);
                         continue;
                     }
-        
+
                     let path = PathBuf::from(file.unwrap().file_name());
                     let stringified = path.to_str().unwrap_or("unknown");
-        
+
                     if let Some(ext) = path.extension() {
                         if ext.to_str().unwrap() != "ual" {
                             continue;
                         }
-        
+
                         let source = fs::read_to_string(&full_path.join(&path));
-        
+
                         if let Err(e) = source {
                             errors.push(e);
                             continue;
                         }
-        
+
                         let filename = Rc::from(stringified);
                         let description = self.get_automation_description(
-                            source.unwrap().into(), 
+                            source.unwrap().into(),
                             Rc::clone(&filename)
                         );
-        
+
                         if let Err(ExecutionInterrupt::Exception { value, traceback, thread }) = description {
                             errors.push(Error::other(format_traceback!(traceback, value, thread)));
                             continue;
                         }
-        
+
                         output.push(AutomationFileInfo::new(filename, description.unwrap()));
                     }
                 }
@@ -2841,7 +2898,7 @@ impl UniV {
             self.gui.build_fn = Gui::popup;
             self.gui.popup.set("Error", &error_buf).unwrap();
             self.run_gui()?;
-        } 
+        }
 
         Ok(output)
     }
@@ -2868,9 +2925,187 @@ impl UniV {
         }
     }
 
+    #[cfg(not(feature = "dev"))]
+    fn find_or_install_ffmpeg(&mut self) -> Result<bool, ExecutionInterrupt> {
+        for (msg, command) in [
+            ("in program path", program_dir!().join("ffmpeg")), 
+            ("globally", PathBuf::from("ffmpeg"))
+        ] {
+            log!(TraceLogLevel::LOG_INFO, "Attempting to find ffmpeg executable {}", msg);
+
+            match Command::new(&command).arg("-version").output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        log!(TraceLogLevel::LOG_INFO, "Found ffmpeg at {:?}", command);
+                        self.render.ffmpeg_executable = command;
+                        return Ok(true);
+                    }
+
+                    if let Some(code) = output.status.code() {
+                        log!(TraceLogLevel::LOG_WARNING, "ffmpeg command exited with code {}", code);
+                    } else {
+                        log!(TraceLogLevel::LOG_WARNING, "ffmpeg command exited with a non-zero exit code");
+                    }
+                }
+                Err(e) => {
+                    log!(TraceLogLevel::LOG_WARNING, "Failed to execute ffmpeg command: {}", e.to_string());
+                }
+            }
+        }
+
+        if ffmpeg::URL == "" {
+            self.gui.build_fn = Gui::popup;
+            self.gui.popup.set(
+                "Error", 
+                concat!(
+                    "ffmpeg is not installed on your machine and it cannot be downloaded automatically for your platform.\n",
+                    "Please install it manually if you want to use render mode"
+                )
+            ).unwrap();
+            self.run_gui()?;
+            return Ok(false);
+        }
+
+        self.gui.build_fn = Gui::selection;
+        self.gui.selection.set(
+            "Error", 
+            concat!(
+                "You enabled render mode, but it looks like ffmpeg is not present on your machine.\n",
+                "Would you like to download it?"
+            ),
+            [
+                "Yes",
+                "No"
+            ].into_iter().map(|x| Rc::from(x)).collect(), 
+            0
+        ).unwrap();
+        self.run_gui()?;
+
+        if self.gui.selection.index == 1 {
+            return Ok(false);
+        }
+
+        let thread_running = Arc::new(AtomicBool::new(true));
+        let local_running = Arc::clone(&thread_running);
+
+        let handle = std::thread::spawn(move || {
+            let inner = || {
+                let client = reqwest::blocking::ClientBuilder::new()
+                    .timeout(ffmpeg::DOWNLOAD_TIMEOUT)
+                    .build()
+                    .map_err(|e| e.to_string())?;
+
+                let response = client.get(ffmpeg::URL).send()
+                    .map_err(|e| e.to_string())?;
+
+                let status = response.status();
+                if !status.is_success() {
+                    return Err({
+                        if let Some(reason) = status.canonical_reason() {
+                            format!("{}: {}", status.as_str(), reason)
+                        } else {
+                            status.to_string()
+                        }
+                    });
+                }
+
+                let data = response.bytes()
+                    .map_err(|e| e.to_string())?
+                    .to_vec();
+
+                let mut gz = flate2::read::GzDecoder::new(&data[..]);
+                let mut decoded_data = Vec::with_capacity(data.len());
+                gz.read_to_end(&mut decoded_data)
+                    .map_err(|e| e.to_string())?;
+
+                drop(gz);
+                drop(data);
+
+                let output_file = program_dir!().join({
+                    if cfg!(windows) {
+                        "ffmpeg.exe"
+                    } else {
+                        "ffmpeg"
+                    }
+                });
+
+                let mut f = File::create(&output_file)
+                    .map_err(|e| e.to_string())?;
+                f.write_all(&decoded_data)
+                    .map_err(|e| e.to_string())?;
+
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    // make file readable and executable
+                    fs::set_permissions(output_file, fs::Permissions::from_mode(0o555))
+                        .map_err(|e| e.to_string())?;
+                }
+
+                Ok(())
+            };
+
+            let result = inner();
+            thread_running.store(false, atomic::Ordering::Relaxed);
+            result
+        });
+
+        self.gui.build_fn = Gui::loading_panel;
+        self.gui.loading_panel.set_message("Downloading and installing ffmpeg...");
+        self.gui.loading_panel.running = local_running;
+        self.run_gui()?;
+
+        handle.join()
+            .map_err(|_| self.vm.create_exception(UniLValue::String(Rc::from("Error joining ffmpeg download process"))))?
+            .map_err(|e| self.vm.create_exception(UniLValue::String(
+                format!("An error occurred while trying to download ffmpeg:\n{}", e.to_string()
+            ).into())))?;
+
+        log!(TraceLogLevel::LOG_INFO, "Verifying ffmpeg installation");
+        self.loading_message("Verifying ffmpeg installation...")?;
+
+        let command = program_dir!().join("ffmpeg");
+        let error = {
+            match Command::new(&command).arg("-version").output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        log!(TraceLogLevel::LOG_INFO, "ffmpeg was installed correctly");
+                        self.render.ffmpeg_executable = command;
+                        return Ok(true);
+                    }
+
+                    if let Some(code) = output.status.code() {
+                        log!(TraceLogLevel::LOG_ERROR, "ffmpeg command exited with code {}", code);
+                        format!("exit code: {}", code)
+                    } else {
+                        log!(TraceLogLevel::LOG_ERROR, "ffmpeg command exited with a non-zero exit code");
+                        String::from("non-zero exit code")
+                    }
+                }
+                Err(e) => {
+                    let error = e.to_string();
+                    log!(TraceLogLevel::LOG_ERROR, "Failed to execute ffmpeg command: {}", error);
+                    error
+                }
+            }
+        };
+
+        self.gui.build_fn = Gui::popup;
+        self.gui.popup.set("Error", format!("ffmpeg was not installed correctly.\nError: {}", error).as_str()).unwrap();
+        self.run_gui()?;
+        Ok(false)
+    }
+
     fn main_menu(&mut self) -> Result<(), ExecutionInterrupt> {
         loop {
+            #[cfg(not(feature = "dev"))]
             if self.settings.render {
+                if !self.render.active && !self.find_or_install_ffmpeg()? {
+                    self.settings.render = false;
+                    self.try_save_settings();
+                    continue;
+                }
+
                 self.enable_render_mode();
             } else {
                 self.enable_realtime_mode();
@@ -2929,12 +3164,12 @@ impl UniV {
                             .expect("GUI returned invalid visual ID");
 
                         if let Err(e) = self.run_sorting_sequence(
-                            self.gui.run_sort.distribution, 
-                            self.gui.run_sort.shuffle, 
-                            self.gui.run_sort.category, 
-                            self.gui.run_sort.sort, 
-                            self.gui.run_sort.array_length, 
-                            self.gui.run_sort.unique_amt, 
+                            self.gui.run_sort.distribution,
+                            self.gui.run_sort.shuffle,
+                            self.gui.run_sort.category,
+                            self.gui.run_sort.sort,
+                            self.gui.run_sort.array_length,
+                            self.gui.run_sort.unique_amt,
                             self.gui.run_sort.speed
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
@@ -2973,7 +3208,7 @@ impl UniV {
                     if self.run_all_sorts.get().is_none() {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
-                            "Error", 
+                            "Error",
                             format!("Could not find '{}' automation file", RUN_ALL_SORTS_FILENAME).as_str()
                         ).unwrap();
                         self.run_gui()?;
@@ -3022,24 +3257,20 @@ impl UniV {
                             self.automation_interpreter.mode = AutomationMode::RunCategory(category);
                         }
 
-                        if let Some(run_all) = self.run_all_sorts.get() {
-                            if let Err(e) = self.execute_automation(
-                                Rc::clone(&run_all.source), 
-                                Rc::clone(&run_all.filename)
-                            ) {
-                                if matches!(e, ExecutionInterrupt::StopAlgorithm) {
-                                    self.stop_algorithm()?;
-                                    self.finalize_render()?;
-                                    self.user_values.clear();
-                                    continue;
-                                } else {
-                                    return Err(e);
-                                }
+                        if let Err(e) = self.execute_automation(
+                            Rc::clone(&get_expect!(self.run_all_sorts).source),
+                            Rc::clone(&get_expect!(self.run_all_sorts).filename)
+                        ) {
+                            if matches!(e, ExecutionInterrupt::StopAlgorithm) {
+                                self.stop_algorithm()?;
+                                self.finalize_render()?;
+                                self.user_values.clear();
+                                continue;
+                            } else {
+                                return Err(e);
                             }
-                        } else {
-                            unreachable!()
                         }
-                        
+
                         self.finalize_render()?;
                         self.user_values.clear();
                         self.gui.build_fn = Gui::popup;
@@ -3055,13 +3286,13 @@ impl UniV {
                     if self.run_all_shuffles.get().is_none() {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
-                            "Error", 
+                            "Error",
                             format!("Could not find '{}' automation file", RUN_ALL_SHUFFLES_FILENAME).as_str()
                         ).unwrap();
                         self.run_gui()?;
                         continue;
                     }
-                    
+
                     loop {
                         self.reset_shuffle_automation();
                         self.gui.build_fn = Gui::run_all_shuffles;
@@ -3091,24 +3322,20 @@ impl UniV {
                         self.automation_interpreter.reset();
                         self.automation_interpreter.mode = AutomationMode::RunShuffles;
 
-                        if let Some(run_all) = self.run_all_shuffles.get() {
-                            if let Err(e) = self.execute_automation(
-                                Rc::clone(&run_all.source), 
-                                Rc::clone(&run_all.filename)
-                            ) {
-                                if matches!(e, ExecutionInterrupt::StopAlgorithm) {
-                                    self.stop_algorithm()?;
-                                    self.finalize_render()?;
-                                    self.user_values.clear();
-                                    continue;
-                                } else {
-                                    return Err(e);
-                                }
+                        if let Err(e) = self.execute_automation(
+                            Rc::clone(&get_expect!(self.run_all_shuffles).source),
+                            Rc::clone(&get_expect!(self.run_all_shuffles).filename)
+                        ) {
+                            if matches!(e, ExecutionInterrupt::StopAlgorithm) {
+                                self.stop_algorithm()?;
+                                self.finalize_render()?;
+                                self.user_values.clear();
+                                continue;
+                            } else {
+                                return Err(e);
                             }
-                        } else {
-                            unreachable!()
                         }
-                        
+
                         self.finalize_render()?;
                         self.user_values.clear();
                         self.gui.build_fn = Gui::popup;
@@ -3136,9 +3363,9 @@ impl UniV {
 
                         last_index = self.gui.automation_selection.index;
                         let automation = {
-                            if let Some(automation) = 
+                            if let Some(automation) =
                                 self.try_load_automation(&automations[last_index].filename)
-                                    .map_err(|e| self.automation_interpreter.create_exception(e.to_string().into()))? 
+                                    .map_err(|e| self.automation_interpreter.create_exception(e.to_string().into()))?
                             {
                                 automation
                             } else {
@@ -3174,14 +3401,14 @@ impl UniV {
 
                         let new_res = self.settings.resolution != self.gui.settings.object.resolution;
 
-                        if self.gui.settings.config_deleted && 
-                            (self.gui.settings.back || !new_res) && 
-                            !(self.gui.settings.sound_setup || self.gui.settings.reload_algos) 
+                        if self.gui.settings.config_deleted &&
+                            (self.gui.settings.back || !new_res) &&
+                            !(self.gui.settings.sound_setup || self.gui.settings.reload_algos)
                         {
                             // if a configuration is deleted, reinitialize visuals so that they can reload their configs
                             // (and potentially start the configuration screen). if `new_res` is true and we're saving,
                             // this is not needed because `set_window_size` will be called and do it on its own.
-                            // also, don't do this if the user pressed on the sound setup or reload algorithms button, 
+                            // also, don't do this if the user pressed on the sound setup or reload algorithms button,
                             // because that would be confusing
                             self.init_visuals()?;
                         }
@@ -3192,15 +3419,15 @@ impl UniV {
                                     .expect("GUI returned invalid sound ID");
 
                                 sound.prepare(
-                                    &self.shared, 
-                                    &mut self.gui, 
-                                    get_expect_mut!(self.rl_handle), 
+                                    &self.shared,
+                                    &mut self.gui,
+                                    get_expect_mut!(self.rl_handle),
                                     get_expect!(self.rl_thread)
                                 )?;
 
                                 self.gui.settings.load_configs();
                                 continue;
-                            } 
+                            }
 
                             if cfg!(not(feature = "lite")) && self.gui.settings.reload_algos {
                                 self.reload_algos()?;
@@ -3212,23 +3439,28 @@ impl UniV {
                                     .expect("GUI returned invalid sound ID");
                             }
 
-                            let new_reverb = self.settings.reverb != self.gui.settings.object.reverb;
-                            
+                            let new_reverb  = self.settings.reverb  != self.gui.settings.object.reverb;
+                            let new_profile = self.settings.profile != self.gui.settings.object.profile;
+
                             if self.settings != self.gui.settings.object {
                                 self.settings = self.gui.settings.object.clone();
                                 self.try_save_settings();
                             }
-                            
+
                             if new_res {
                                 self.set_window_size()?;
-                            } 
+                            }
+
+                            if new_profile {
+                                self.try_load_current_profile();
+                            }
 
                             if new_reverb {
                                 self.sync_reverb();
                                 get_sound!(self).prepare(
-                                    &self.shared, 
-                                    &mut self.gui, 
-                                    get_expect_mut!(self.rl_handle), 
+                                    &self.shared,
+                                    &mut self.gui,
+                                    get_expect_mut!(self.rl_handle),
                                     get_expect!(self.rl_thread)
                                 )?;
                             }
@@ -3296,33 +3528,6 @@ impl Drop for UniV {
     }
 }
 
-#[cfg(not(feature = "lite"))]
-fn compile_algos() -> Result<(), Error> {
-    let mut errors = Vec::new();
-    let bytecode = UniV::new().compile_algos(&mut errors);
-    
-    if errors.is_empty() {
-        log!(TraceLogLevel::LOG_INFO, "Serializing bytecode");
-
-        let mut f = File::create("algos.unib")?;
-        encode_into_std_write(bytecode.unwrap(), &mut f, bincode::config::standard())
-            .map_err(|e| Error::other(e.to_string()))?;
-
-        log!(TraceLogLevel::LOG_INFO, "Compilation was successful");
-        Ok(())
-    } else {
-        let mut error_buf = String::from("Something went wrong while loading algorithms:");
-
-        for error in errors {
-            error_buf.push('\n');
-            error_buf.push_str(&error.to_string());
-        }
-
-        log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
-        Err(Error::other("Compilation failed"))
-    }
-}
-
 fn main() -> Result<(), Error> {
     let args_map: HashMap<String, usize> = env::args().enumerate().map(|(i, x)| (x, i)).collect();
 
@@ -3351,19 +3556,29 @@ fn main() -> Result<(), Error> {
             }
         }
     }).expect("Program directory OnceCell was already set");
-    
-    #[cfg(not(feature = "lite"))]
-    if args_map.contains_key("--compile-algos") {
-        return compile_algos();
+
+    #[cfg(feature = "dev")]
+    {
+        if args_map.contains_key("--compile-algos") {
+            return dev::compile_algos(args_map.contains_key("--with-headers"));
+        }
+
+        if args_map.contains_key("--generate-headers") {
+            return dev::generate_headers();
+        }
     }
 
-    // avoids raylib unloading messages flood when the program panics
-    let default_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |info| {
-        unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_NONE as i32) };
-        default_hook(info);
-    }));
+    #[cfg(not(feature = "dev"))] 
+    {
+        // avoids raylib unloading messages flood when the program panics
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_NONE as i32) };
+            default_hook(info);
+        }));
 
-    UniV::new().init_run();
+        UniV::new().init_run();
+    }
+
     Ok(())
 }

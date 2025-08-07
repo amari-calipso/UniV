@@ -1,7 +1,7 @@
 class NewShuffleMergeSort:
     def __init__(this, rot):
         if rot is None:
-            this.__rotate = UniV_getUserRotation("Select rotation algorithm (default: Gries-Mills)").lengths
+            this.__rotate = UniV_getUserRotation("Select rotation algorithm", "Gries-Mills").lengths
         else:
             this.__rotate = sortingVisualizer.getRotationByName(rot).lengths
 

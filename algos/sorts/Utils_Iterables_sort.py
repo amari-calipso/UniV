@@ -10,7 +10,7 @@ class UtilsIterablesSortMerge:
         rl = b-m
         ll = m-a
         bl = 1 if this.aux is None else len(this.aux)
-        min_ = bl if rl != ll and min([bl, rl, ll]) > 8 else 1
+        min_ = bl if rl != ll and min(bl, rl, ll) > 8 else 1
         while ll > min_ and rl > min_:
             if rl < ll:
                 blockSwap(array, a, m, rl)
@@ -73,9 +73,17 @@ class UtilsIterablesSortMerge:
             array[right].write(this.aux[aux])
             right -= 1
             aux -= 1
+        
+    def checkMergeBounds(this, array, a, m, b):
+        if array[m-1] <= array[m]:
+            return True
+        elif array[a] > array[b-1]:
+            this.rotate(array, a, m, b)
+            return True
+        return False
 
     def mergeInPlace(this, array, a, m, b, check):
-        if checkMergeBounds(array, a, m, b, this.rotate):
+        if this.checkMergeBounds(array, a, m, b):
             return
         if check:
             b = lrBinarySearch(array, m, b, array[m-1].read(), True)
@@ -116,7 +124,7 @@ class UtilsIterablesSortMerge:
             this.merge(array, m3, m2, b, False)
 
     def merge(this, array, a, m, b, check):
-        if checkMergeBounds(array, a, m, b, this.rotate):
+        if this.checkMergeBounds(array, a, m, b):
             return
         if check:
             b = lrBinarySearch(array, m, b, array[m-1].read(), True)

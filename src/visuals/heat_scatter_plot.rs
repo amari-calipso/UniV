@@ -41,25 +41,19 @@ visual! {
                 continue;
             }
 
-            let color; 
-            if let Some(col) = LineVisual::get_highlight_color(last_i, i, indices) {
-                if col == self.highlight_color() {
-                    color = col;
+            let y = (shared.array[i].pos_value() as f64 * self.dots_visual.base.line_length_mlt) as i32;
+
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                if color == self.highlight_color() {
+                    self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, true, draw);
                 } else {
-                    color = shared.heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                    let color = shared.heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                    self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, false, draw);
                 }
             } else {
-                color = shared.heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                let color = shared.heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, false, draw);
             }
-
-            let y = (shared.array[i].pos_value() as f64 * self.dots_visual.base.line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.resolution_y - y, 
-                width as i32, 
-                width as i32, 
-                color
-            );
 
             x += width;
             last_i = i;
@@ -82,25 +76,19 @@ visual! {
                 continue;
             }
 
-            let color; 
-            if let Some(col) = LineVisual::get_highlight_color(last_i, i, indices) {
-                if col == self.highlight_color() {
-                    color = col;
+            let y = (shared.aux[i].pos_value() as f64 * self.dots_visual.base.aux_line_length_mlt) as i32;
+            
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                if color == self.highlight_color() {
+                    self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, true, draw);
                 } else {
-                    color = shared.aux_heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                    let color = shared.aux_heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                    self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, false, draw);
                 }
             } else {
-                color = shared.aux_heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                let color = shared.aux_heatmap.get_color(COLOR_MAP, MIN_IDX, i);
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, false, draw);
             }
-
-            let y = (shared.aux[i].pos_value() as f64 * self.dots_visual.base.aux_line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.aux_resolution_y - y, 
-                width as i32, 
-                width as i32, 
-                color
-            );
 
             x += width;
             last_i = i;

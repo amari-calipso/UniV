@@ -38,22 +38,13 @@ visual! {
                 continue;
             }
 
-            let color = {
-                if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
-                    color
-                } else {
-                    Color::WHITE
-                }
-            };
-
             let y = (shared.array[i].pos_value() as f64 * self.dots_visual.base.line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.resolution_y - y, 
-                width as i32, 
-                width as i32, 
-                color
-            );
+
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, color, color == self.highlight_color(), draw);
+            } else {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.resolution_y, Color::WHITE, false, draw);
+            }
 
             x += width;
             last_i = i;
@@ -76,22 +67,13 @@ visual! {
                 continue;
             }
 
-            let color = {
-                if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
-                    color
-                } else {
-                    Color::WHITE
-                }
-            };
-
             let y = (shared.aux[i].pos_value() as f64 * self.dots_visual.base.aux_line_length_mlt) as i32;
-            draw.draw_rectangle(
-                x as i32, 
-                self.dots_visual.base.aux_resolution_y - y, 
-                width as i32, 
-                width as i32, 
-                color
-            );
+
+            if let Some(color) = LineVisual::get_highlight_color(last_i, i, indices) {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, color, color == self.highlight_color(), draw);
+            } else {
+                self.dots_visual.draw_dot(x, y, width, self.dots_visual.base.aux_resolution_y, Color::WHITE, false, draw);
+            }
 
             x += width;
             last_i = i;

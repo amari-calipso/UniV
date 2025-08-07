@@ -239,6 +239,19 @@ impl Gui {
                         ui.text("Enables render mode");
                     });
                 }
+            
+                ui.disabled(!self.settings.object.render, || {
+                    ui.checkbox("Save timestamps", &mut self.settings.object.save_timestamps);
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            ui.text(concat!(
+                                "Stores a list of timestamps in YouTube-compatible format as defined in the running automation.\n",
+                                "The output is saved in 'timestamps.txt'.\n",
+                                "Note that this only works in render mode"
+                            ));
+                        });
+                    }
+                });
 
                 ui.input_scalar("FPS", &mut self.settings.object.render_fps).build();
                 if ui.is_item_hovered() {

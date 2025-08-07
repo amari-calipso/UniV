@@ -1,8 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
+use alanglib::{ast::SourcePos, report::error_pos, scanner::{is_alpha, is_alphanumeric, is_beginning_digit, is_bin_digit, is_digit, is_hex_digit, is_oct_digit, substring}};
 use lazy_static::lazy_static;
-
-use crate::utils::{lang::{error, is_alpha, is_alphanumeric, is_beginning_digit, is_bin_digit, is_digit, is_hex_digit, is_oct_digit}, substring};
 
 use super::tokens::{Token, TokenType};
 
@@ -13,6 +12,7 @@ lazy_static! {
         keywords.insert("by",           TokenType::By);
         keywords.insert("all",          TokenType::All);
         keywords.insert("and",          TokenType::And);
+        keywords.insert("max",          TokenType::Max);
         keywords.insert("pop",          TokenType::Pop);
         keywords.insert("run",          TokenType::Run);
         keywords.insert("set",          TokenType::Set);
@@ -28,9 +28,11 @@ lazy_static! {
         keywords.insert("scaled",       TokenType::Scaled);
         keywords.insert("unique",       TokenType::Unique);
         keywords.insert("visual",       TokenType::Visual);
+        keywords.insert("maximum",      TokenType::Max);
         keywords.insert("shuffle",      TokenType::Shuffle);
         keywords.insert("describe",     TokenType::Describe);
-        keywords.insert("shuffles",     TokenType::Shuffles);        
+        keywords.insert("shuffles",     TokenType::Shuffles);
+        keywords.insert("timestamp",    TokenType::Timestamp);      
         keywords.insert("distribution", TokenType::Distribution);
         keywords
     };
@@ -99,11 +101,14 @@ impl Scanner {
     }
 
     fn error(&mut self, msg: &str) {
-        self.errors.push(error(
-            &self.source, msg,
-            &self.filename,
-            self.start.saturating_sub(self.start_positions[self.line]),
-            self.curr.saturating_sub(self.start), self.line
+        self.errors.push(error_pos(
+            &SourcePos::new(
+                Rc::clone(&self.source),
+                Rc::clone(&self.filename),
+                self.start.saturating_sub(self.start_positions[self.line]),
+                self.curr.saturating_sub(self.start), self.line
+            ),
+            msg
         ));
     }
 

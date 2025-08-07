@@ -30,6 +30,22 @@ fn List_max(items: List) {
     return max;
 }
 
+fn insertToRight(array: List, from: Int, to: Int) {
+    tmp := array[from];
+    for i := from; i < to; i++ {
+        array[i] = array[i + 1];
+    }
+    array[to] = tmp;
+}
+
+fn List_removeIdx(items: List, idx: Int) {
+    if len(items) != 0 && idx != len(items) - 1 {
+        insertToRight(items, idx, len(items) - 1);
+    } 
+    
+    return List_pop(items);
+}
+
 fn Thread_join(id: Int) {
     while Thread_isRunning(id) {}
     return Thread_getOutput(id);

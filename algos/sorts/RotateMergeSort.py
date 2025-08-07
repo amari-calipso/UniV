@@ -1,7 +1,7 @@
 class RotateMergeSort:
     def __init__(this, rot):
         if rot is None:
-            this.rotate = UniV_getUserRotation("Select rotation algorithm (default: Gries-Mills)").indexed
+            this.rotate = UniV_getUserRotation("Select rotation algorithm", "Gries-Mills").indexed
         else:
             this.rotate = sortingVisualizer.getRotationByName(rot).indexed
 
