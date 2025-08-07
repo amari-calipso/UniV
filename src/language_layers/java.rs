@@ -600,13 +600,13 @@ impl ASTTransformer {
 
                 if let Some(constructor_fn) = constructor {
                     if let Expression::Function { params, body, .. } = constructor_fn {
+                        let this = Expression::Variable { 
+                            name: self.tok_from_node_with_lexeme(node, "this") 
+                        };
+                        
                         if let Some(info) = info {
                             let array_tok = self.tok_from_node_with_lexeme(&class_name_node, "array");
                             let array_expr = Expression::Variable { name: array_tok.clone() };
-                            
-                            let this_expr = Expression::Variable { 
-                                name: self.tok_from_node_with_lexeme(&class_name_node, "this") 
-                            };
 
                             definitions.push(Expression::AlgoDecl { 
                                 name: self.tok_from_node_with_lexeme(&class_name_node, "sort"), 
@@ -638,7 +638,7 @@ impl ASTTransformer {
                                         }), 
                                         body: vec![
                                             Expression::Assign { 
-                                                target: Box::new(this_expr.clone()), 
+                                                target: Box::new(this.clone()), 
                                                 op: self.tok_from_node_with_type(&class_name_node, TokenType::Walrus), 
                                                 value: Box::new(Expression::Call { 
                                                     callee: Box::new(Expression::Variable { name: class_name.clone() }),
@@ -649,12 +649,12 @@ impl ASTTransformer {
                                             },
                                             Expression::Call { 
                                                 callee: Box::new(Expression::Get { 
-                                                    object: Box::new(this_expr.clone()), 
+                                                    object: Box::new(this.clone()), 
                                                     name: self.tok_from_node_with_lexeme(&class_name_node, "runSort") 
                                                 }), 
                                                 paren: class_name.clone(), 
                                                 args: vec![
-                                                    this_expr,
+                                                    this.clone(),
                                                     array_expr.clone(),
                                                     Expression::Call { 
                                                         callee: Box::new(Expression::Variable { 
@@ -676,10 +676,6 @@ impl ASTTransformer {
                                 }
                             });
                         }
-
-                        let this = Expression::Variable { 
-                            name: self.tok_from_node_with_lexeme(node, "this") 
-                        };
 
                         let mut fn_body: Vec<Expression> = [
                             Expression::Assign { 
