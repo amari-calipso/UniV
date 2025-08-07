@@ -6,6 +6,19 @@ fn max(a, b) {
     a > b ? a : b;
 }
 
+fn compareValues(a, b) {
+    (a > b) - (a < b);
+}
+
+fn compareIndexValue(array: List, idx: Int, value) {
+    a := array[idx];
+    (a > value) - (a < value);
+}
+
+fn writeToIndex(array: List, idx: Int, value) {
+    array[idx] = value;
+}
+
 fn List_min(items: List) {
     min := items[0];
 

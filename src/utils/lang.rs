@@ -106,7 +106,7 @@ pub fn get_token_from_variable(expr: Expression) -> Token {
 }
 
 pub fn get_vec_of_expr_from_block(expr: Expression) -> Vec<Expression> {
-    if let Expression::Block { expressions, .. } = expr {
+    if let Expression::Block { expressions, .. } | Expression::ScopedBlock { expressions, .. } = expr {
         expressions
     } else {
         panic!("Expression was not Block")

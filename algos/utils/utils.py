@@ -93,10 +93,6 @@ def backwardBlockSwap(array, a, b, len):
         array[a+i].swap(array[b+i])
         i -= 1
 
-
-def compareValues(a, b):
-    return (a > b)-(a < b)
-
 compareIntToValue = compareValues
 
 def insertToLeft(array, _from, to):

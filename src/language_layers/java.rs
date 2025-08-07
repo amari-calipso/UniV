@@ -57,7 +57,7 @@ pub struct ASTTransformer {
     
     last_label: Option<Rc<str>>,
 
-    in_sort_decl: Option<HashMap<Rc<str>, Expression>>,
+    curr_sort_decl: Option<HashMap<Rc<str>, Expression>>,
     ignore_super: bool,
     arrayv: bool,
 }
@@ -71,7 +71,7 @@ impl ASTTransformer {
             curr_class_fields: None,
             last_label: None,
             
-            in_sort_decl: None,
+            curr_sort_decl: None,
             ignore_super: false,
             arrayv: false,
         }
@@ -163,8 +163,13 @@ impl ASTTransformer {
                 loop {
                     let param_node = node.child(i).unwrap();
                     let text = self.text_from_node(&param_node);
-                    if text.as_ref() == ")" {
-                        break;
+                    match text.as_ref() {
+                        ")" => break,
+                        "," => {
+                            i += 1;
+                            continue;
+                        }
+                        _ => ()
                     }
 
                     let mut name = self.tok_from_node(node);
@@ -184,8 +189,13 @@ impl ASTTransformer {
                     let param_node = node.child(i).unwrap();
                     let param_tok = self.tok_from_node(&param_node);
                     let text = self.text_from_node(&param_node);
-                    if text.as_ref() == ")" {
-                        break;
+                    match text.as_ref() {
+                        ")" => break,
+                        "," => {
+                            i += 1;
+                            continue;
+                        }
+                        _ => ()
                     }
 
                     match param_node.kind() {
@@ -261,12 +271,14 @@ impl ASTTransformer {
                 }
                 Expression::Function { name, .. } => {
                     let actual_name = name.lexeme.strip_prefix(format!("{}__", class_name.lexeme).as_str()).unwrap_or("_");
-                    if name.lexeme.as_ref() == "__Java_constructor" {
+                    if actual_name == "__Java_constructor" {
                         if init.is_none() {
                             *init = Some(element.clone());
                         } else {
                             error!(self.base, name, "Multiple constructors are not supported");
                         }
+
+                        continue;
                     }
     
                     let mut tok = name.clone();
@@ -298,8 +310,13 @@ impl ASTTransformer {
         loop {
             let arg_node = node.child(i).unwrap();
             let text = self.text_from_node(&arg_node);
-            if text.as_ref() == ")" {
-                break;
+            match text.as_ref() {
+                ")" => break,
+                "," => {
+                    i += 1;
+                    continue;
+                }
+                _ => ()
             }
 
             let arg = ctx.run(|ctx| self.transform_one(&arg_node, ctx)).await;
@@ -353,6 +370,10 @@ impl ASTTransformer {
                 let value = self.text_from_node(&node);
                 Expression::Literal { value, tok: node_token, kind: LiteralKind::Int }
             }
+            "decimal_floating_point_literal" => {
+                let value = self.text_from_node(&node);
+                Expression::Literal { value, tok: node_token, kind: LiteralKind::Float }
+            }
             "hex_integer_literal" => {
                 todo!()
             }
@@ -360,9 +381,6 @@ impl ASTTransformer {
                 todo!()
             }
             "binary_integer_literal" => {
-                todo!()
-            }
-            "decimal_floating_point_literal" => {
                 todo!()
             }
             "hex_floating_point_literal" => {
@@ -538,7 +556,8 @@ impl ASTTransformer {
                     }
                 }
 
-                let class_name = self.tok_from_node(&node.child_by_field_name("name").unwrap());
+                let class_name_node = node.child_by_field_name("name").unwrap();
+                let class_name = self.tok_from_node(&class_name_node);
                 let body_node = node.child_by_field_name("body").unwrap();
 
                 if let Some(superclass) = node.child_by_field_name("superclass") {
@@ -548,7 +567,7 @@ impl ASTTransformer {
                         if superclass_name.lexeme.as_ref() == "Thread" {
                             todo!();
                         } else if self.arrayv && superclass_name.lexeme.as_ref() == "Sort" {
-                            self.in_sort_decl = Some(HashMap::new());
+                            self.curr_sort_decl = Some(HashMap::new());
                         }
                     } 
 
@@ -569,21 +588,95 @@ impl ASTTransformer {
 
                 let mut fields = Vec::new();
                 let mut constructor = None;
-
+                
                 let mut definitions = get_vec_of_expr_from_block(body);
-                self.get_class_definitions(&definitions, &class_name, &mut fields, &mut constructor);    
+                // TODO: we should remove __Java_constructor from definitions, it's useless
+                self.get_class_definitions(&definitions, &class_name, &mut fields, &mut constructor);
         
                 let tok = self.tok_from_node_with_type(node, TokenType::Walrus);
                 let object = Expression::AnonObject { kw: tok.clone(), fields };
 
-                let info = self.in_sort_decl.take();
+                let info = self.curr_sort_decl.take();
 
                 if let Some(constructor_fn) = constructor {
-                    if let Some(info) = info {
-                        todo!("sort postprocessing"); 
-                    }
-
                     if let Expression::Function { params, body, .. } = constructor_fn {
+                        if let Some(info) = info {
+                            let array_tok = self.tok_from_node_with_lexeme(&class_name_node, "array");
+                            let array_expr = Expression::Variable { name: array_tok.clone() };
+                            
+                            let this_expr = Expression::Variable { 
+                                name: self.tok_from_node_with_lexeme(&class_name_node, "this") 
+                            };
+
+                            definitions.push(Expression::AlgoDecl { 
+                                name: self.tok_from_node_with_lexeme(&class_name_node, "sort"), 
+                                object: {
+                                    Box::new(Expression::AnonObject { 
+                                        kw: class_name.clone(), 
+                                        fields: info.into_iter()
+                                            .map(|(name, value)| {
+                                                ObjectField {
+                                                    name: self.tok_from_node_with_lexeme(&class_name_node, name.as_ref()),
+                                                    expr: value,
+                                                    type_: None
+                                                }
+                                            }).collect()
+                                    })
+                                },
+                                function: {
+                                    Box::new(Expression::Function { 
+                                        name: self.tok_from_node_with_lexeme(
+                                            &class_name_node, 
+                                            format!("__ArrayV__{}__runSort", class_name.lexeme).as_str()
+                                        ), 
+                                        params: vec![NamedExpr {
+                                            name: array_tok.clone(),
+                                            expr: None 
+                                        }],
+                                        return_type: Box::new(Expression::Variable { 
+                                            name: self.tok_from_node_with_lexeme(&class_name_node, "any") 
+                                        }), 
+                                        body: vec![
+                                            Expression::Assign { 
+                                                target: Box::new(this_expr.clone()), 
+                                                op: self.tok_from_node_with_type(&class_name_node, TokenType::Walrus), 
+                                                value: Box::new(Expression::Call { 
+                                                    callee: Box::new(Expression::Variable { name: class_name.clone() }),
+                                                    paren: class_name.clone(),
+                                                    args: vec![make_null()]
+                                                }),
+                                                type_spec: None 
+                                            },
+                                            Expression::Call { 
+                                                callee: Box::new(Expression::Get { 
+                                                    object: Box::new(this_expr.clone()), 
+                                                    name: self.tok_from_node_with_lexeme(&class_name_node, "runSort") 
+                                                }), 
+                                                paren: class_name.clone(), 
+                                                args: vec![
+                                                    this_expr,
+                                                    array_expr.clone(),
+                                                    Expression::Call { 
+                                                        callee: Box::new(Expression::Variable { 
+                                                            name: self.tok_from_node_with_lexeme(&class_name_node, "len") 
+                                                        }), 
+                                                        paren: class_name.clone(), 
+                                                        args: vec![array_expr] 
+                                                    },
+                                                    // TODO: make this include actual bucketCount
+                                                    Expression::Literal { 
+                                                        value: Rc::from("0"), 
+                                                        tok: class_name.clone(), 
+                                                        kind: LiteralKind::Int
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }) 
+                                }
+                            });
+                        }
+
                         let this = Expression::Variable { 
                             name: self.tok_from_node_with_lexeme(node, "this") 
                         };
@@ -630,27 +723,32 @@ impl ASTTransformer {
             }
             "method_declaration" => {
                 if let Some(body_node) = node.child_by_field_name("body") {    
-                    let header_node = node.child(1).unwrap();
-
                     // TODO: verify annotations, currently they're just ignored silently
 
-                    let mut method_declarator_node = header_node.child(header_node.child_count() - 1).unwrap();
-                    if method_declarator_node.kind() == "throws" {
-                        method_declarator_node = header_node.child(header_node.child_count() - 2).unwrap();
+                    let name_node = node.child_by_field_name("name").unwrap();
+                    let name_node_text = self.text_from_node(&name_node);
+                    let full_name = self.base.get_fn_name(&name_node_text);
+                    let name = self.tok_from_node_with_lexeme(&name_node, &full_name);
+
+                    let mut params = self.get_parameters(
+                        &node.child_by_field_name("parameters").unwrap()
+                    );
+
+                    let previous = Rc::clone(&self.environment);
+                    self.environment = Rc::new(RefCell::new(Environment::with_enclosing(Rc::clone(&previous))));
+
+                    {
+                        let mut env = self.environment.borrow_mut();
+                        for param in &params {
+                            env.define(&param.name.lexeme);
+                        }
                     }
 
                     let body = get_vec_of_expr_from_block(
                         ctx.run(|ctx| self.transform_one(&body_node, ctx)).await
                     );
 
-                    let name_node = method_declarator_node.child_by_field_name("name").unwrap();
-                    let name = get_token_from_variable(
-                        ctx.run(|ctx| self.transform_one(&name_node, ctx)).await
-                    );
-
-                    let mut params = self.get_parameters(
-                        &method_declarator_node.child_by_field_name("parameters").unwrap()
-                    );
+                    self.environment = previous;
 
                     params.insert(0, NamedExpr {
                         name: self.tok_from_node_with_lexeme(node, "this"), 
@@ -741,7 +839,8 @@ impl ASTTransformer {
 
                 match op.type_ {
                     TokenType::Greater | TokenType::Less | 
-                    TokenType::GreaterEqual | TokenType::LessEqual => {
+                    TokenType::GreaterEqual | TokenType::LessEqual |
+                    TokenType::EqualEqual | TokenType::BangEqual => {
                         Expression::Cmp { 
                             left: Box::new(left), 
                             op, 
@@ -1339,7 +1438,7 @@ impl ASTTransformer {
                 let mut name = get_token_from_variable(
                     ctx.run(|ctx| self.transform_one(&name_node, ctx)).await
                 );
-                name.set_lexeme("__Java_constructor");
+                name.set_lexeme(&self.base.get_fn_name("__Java_constructor"));
 
                 let params = self.get_parameters(
                     &node.child_by_field_name("parameters").unwrap()
@@ -1353,7 +1452,7 @@ impl ASTTransformer {
                 }
             }
             "constructor_body" => {
-                self.ignore_super = self.in_sort_decl.is_some();
+                self.ignore_super = self.curr_sort_decl.is_some();
 
                 let mut expressions = Vec::new();
                 
@@ -1380,15 +1479,16 @@ impl ASTTransformer {
                 todo!()
             }
             "method_invocation" => {
-                if self.in_sort_decl.is_some() {
-                    let name_node = node.child_by_field_name("name").unwrap();
-                    let name_expr = ctx.run(|ctx| self.transform_one(&name_node, ctx)).await;
+                let name_node = node.child_by_field_name("name").unwrap();
+                let name_expr = ctx.run(|ctx| self.transform_one(&name_node, ctx)).await;
+
+                if self.ignore_super && self.curr_sort_decl.is_some() {
                     let name = get_token_from_variable(name_expr);
 
                     let args_node = node.child_by_field_name("arguments").unwrap();
                     let args: Vec<Expression> = ctx.run(|ctx| self.get_arguments(&args_node, ctx)).await;
 
-                    if let Some(info) = &mut self.in_sort_decl {
+                    if let Some(info) = &mut self.curr_sort_decl {
                         // handles ArrayV declarations
                         match name.lexeme.as_ref() {
                             "setSortListName" | 
@@ -1443,7 +1543,103 @@ impl ASTTransformer {
                     
                     make_null()
                 } else {
-                    todo!()
+                    let args_node = node.child_by_field_name("arguments").unwrap();
+                    let args = ctx.run(|ctx| self.get_arguments(&args_node, ctx)).await;
+
+                    if let Some(object_node) = node.child_by_field_name("object") {
+                        let object = ctx.run(|ctx| self.transform_one(&object_node, ctx)).await;
+
+                        let get_name = {
+                            if let Expression::Get { name, .. } = name_expr {
+                                name
+                            } else {
+                                get_token_from_variable(name_expr) 
+                            }
+                        };
+
+                        if matches!(object, Expression::Variable { .. }) {
+                            Expression::Call { 
+                                callee: Box::new(Expression::Get { 
+                                    object: Box::new(object.clone()), 
+                                    name: get_name
+                                }),
+                                paren: node_token, 
+                                args: [object].into_iter().chain(args.into_iter()).collect()
+                            }
+                        } else {
+                            let tmp_name = self.base.tmp_var();
+                            let tmp = Expression::Variable { 
+                                name: self.tok_from_node_with_lexeme(&object_node, &tmp_name) 
+                            };
+
+                            Expression::Block {
+                                opening_brace: node_token.clone(),
+                                expressions: vec![
+                                    Expression::Assign { 
+                                        target: Box::new(tmp.clone()), 
+                                        op: self.tok_from_node_with_type(&object_node, TokenType::Walrus), 
+                                        value: Box::new(object), 
+                                        type_spec: None 
+                                    },
+                                    Expression::Call { 
+                                        callee: Box::new(Expression::Get {
+                                            object: Box::new(tmp.clone()), 
+                                            name: get_name
+                                        }), 
+                                        paren: node_token, 
+                                        args: [tmp].into_iter().chain(args.into_iter()).collect()
+                                    }
+                                ]
+                            }
+                        }
+                    } else {
+                        Expression::Call { 
+                            callee: Box::new(name_expr), 
+                            paren: node_token, 
+                            args
+                        }
+                    }
+                }
+            }
+            "local_variable_declaration" => {
+                let mut cursor = node.walk();
+                let mut declarations = Vec::new();
+                for declarator in node.children_by_field_name("declarator", &mut cursor) {
+                    let name_node = declarator.child_by_field_name("name").unwrap();
+                    let name_expr = ctx.run(|ctx| self.transform_one(&name_node, ctx)).await;
+
+                    let name = self.text_from_node(&name_node);
+                    self.environment.borrow_mut().define(&name);
+
+                    let value = {
+                        if let Some(value_node) = declarator.child_by_field_name("value") {
+                            ctx.run(|ctx| self.transform_one(&value_node, ctx)).await
+                        } else {
+                            make_null()
+                        }
+                    };
+
+                    declarations.push(
+                        Expression::Assign {
+                            type_spec: {
+                                let mut name = self.tok_from_node(&name_node);
+                                name.set_lexeme("any");
+                                Some(Box::new(Expression::Variable { name }))
+                            },
+                            target: Box::new(name_expr),
+                            op: self.tok_from_node_with_type(&node, TokenType::Walrus),
+                            value: Box::new(value),
+                        }
+                    );
+                }
+
+                if declarations.len() == 1 {
+                    declarations.pop().unwrap()
+                } else {
+                    Expression::Block { 
+                        opening_brace: node_token, 
+                        expressions: declarations 
+                    }
                 }
             }
             "method_reference" => {
@@ -1581,12 +1777,6 @@ impl ASTTransformer {
             "array_type" => {
                 todo!()
             }
-            "local_variable_declaration" => {
-                todo!()
-            }
-            "_variable_declarator_list" => {
-                todo!()
-            }
             "compact_constructor_declaration" => {
                 todo!()
             }
@@ -1649,6 +1839,11 @@ language_layer! {
 
         let mut ast_transformer = java::ASTTransformer::new(source, filename);
         let ast = ast_transformer.transform(&root);
+
+        println!("{}", crate::unil::ast::Expression::Block { 
+            opening_brace: crate::unil::tokens::Token::empty(), 
+            expressions: ast.clone() 
+        }.codegen());
 
         if ast_transformer.base.errors.is_empty() {
             Ok(ast)

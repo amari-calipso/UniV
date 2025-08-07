@@ -440,7 +440,7 @@ impl Analyzer {
             Expression::Block { expressions, .. } => Ok(ctx.run(|ctx| self.get_types(&expressions, toplevel, ctx)).await),
             Expression::ScopedBlock { expressions, .. } => {
                 let previous = Rc::clone(&self.environment);
-                self.environment = Rc::new(RefCell::new(AnalyzerEnvironment::with_enclosing(Rc::clone(&self.globals))));
+                self.environment = Rc::new(RefCell::new(AnalyzerEnvironment::with_enclosing(Rc::clone(&previous))));
                 let ret = ctx.run(|ctx| self.get_types(expressions, toplevel, ctx)).await;
                 self.environment = previous;
                 Ok(ret)
