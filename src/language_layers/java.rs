@@ -1,8 +1,9 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
+use alanglib::{report::warning, scanner::substring};
 use tree_sitter::Node;
 
-use crate::{ast_error, language_layer, token_error, token_warning, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField}, tokens::{Token, TokenType}}, univm::object::{AnonObject, UniLValue}, utils::{lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer}, substring}};
+use crate::{error, language_layer, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer}};
 
 struct Environment {
     pub names: HashSet<Rc<str>>,
@@ -81,7 +82,7 @@ impl ASTTransformer {
             Rc::from(text)
         } else {
             let tok = self.tok_from_node(node);
-            token_error!(self.base, tok, "UTF-8 error");
+            error!(self.base, tok, "UTF-8 error");
             Rc::from("")
         }
     }
@@ -198,7 +199,7 @@ impl ASTTransformer {
                             output.push(NamedExpr { name, expr: None });
                         }
                         "spread_parameter" => {
-                            token_error!(self.base, param_tok, "Variable parameter length is not supported");
+                            error!(self.base, param_tok, "Variable parameter length is not supported");
                             continue;
                         }
                         _ => unreachable!()
@@ -249,13 +250,13 @@ impl ASTTransformer {
             match &element {
                 Expression::Assign { target, op, value, .. } => {
                     if !matches!(op.type_, TokenType::Walrus) {
-                        token_error!(self.base, op, "Assignments are not allowed in class body");
+                        error!(self.base, op, "Assignments are not allowed in class body");
                     }
     
                     if let Expression::Variable { name } = &**target {
                         fields.push(ObjectField::new(name.clone(), *value.clone(), None));
                     } else {
-                        ast_error!(self.base, target, "Only variables are supported as assignment targets in class body");
+                        error!(self.base, target, "Only variables are supported as assignment targets in class body");
                     }
                 }
                 Expression::Function { name, .. } => {
@@ -264,7 +265,7 @@ impl ASTTransformer {
                         if init.is_none() {
                             *init = Some(element.clone());
                         } else {
-                            token_error!(self.base, name, "Multiple constructors are not supported");
+                            error!(self.base, name, "Multiple constructors are not supported");
                         }
                     }
     
@@ -283,7 +284,7 @@ impl ASTTransformer {
                 Expression::Block { expressions, .. } => {
                     self.get_class_definitions(expressions, class_name, fields, init);
                 }
-                _ => ast_error!(self.base, element, "Unsupported definition in class body")
+                _ => error!(self.base, element, "Unsupported definition in class body")
             }
         }
     }
@@ -314,7 +315,7 @@ impl ASTTransformer {
         let node_token = self.tok_from_node(node);
         
         if node.is_error() {
-            token_error!(self.base, node_token, "Syntax error");
+            error!(self.base, node_token, "Syntax error");
             return make_null();
         }
 
@@ -339,7 +340,7 @@ impl ASTTransformer {
             }
             "super" => {
                 if !self.ignore_super {
-                    token_error!(self.base, node_token, "Inheritance is not supported");
+                    error!(self.base, node_token, "Inheritance is not supported");
                 }
                 
                 make_null()
@@ -369,7 +370,7 @@ impl ASTTransformer {
             }
             "character_literal" | "string_literal" => {
                 let value = self.text_from_node(node);
-                let value = substring(&value, 1, value.len() - 1).into();
+                let value = substring(&value.to_string(), 1, value.len() - 1).into();
                 Expression::Literal { value, tok: node_token, kind: LiteralKind::String }
             }
             "void_type" => {
@@ -510,7 +511,7 @@ impl ASTTransformer {
                 let second = node.child(1).unwrap();
                 if self.text_from_node(&second).as_ref() != "." {
                     let tok = self.tok_from_node(&second);
-                    token_error!(self.base, tok, "Unsupported syntax");
+                    error!(self.base, tok, "Unsupported syntax");
                     return make_null();
                 }
 
@@ -531,7 +532,7 @@ impl ASTTransformer {
                     for modifier in first.children(&mut cursor) {    
                         if self.text_from_node(&modifier).as_ref() == "abstract" {
                             let tok = self.tok_from_node(&modifier);
-                            token_warning!(tok, "Abstract classes are not supported. Ignoring");
+                            warning(&tok, "Abstract classes are not supported. Ignoring");
                             return make_null();
                         }
                     }
@@ -552,7 +553,7 @@ impl ASTTransformer {
                     } 
 
                     let tok = self.tok_from_node(&superclass);
-                    token_warning!(tok, "Inheritance is not supported. Ignoring");
+                    warning(&tok, "Inheritance is not supported. Ignoring");
                 }
 
                 let old_class_fields = self.curr_class_fields.replace(HashSet::new());
@@ -689,7 +690,7 @@ impl ASTTransformer {
                         "<<=" => TokenType::ShiftLeftEquals,
                         ">>=" | ">>>=" => TokenType::ShiftRightEquals,
                         _ => {
-                            token_error!(self.base, op, "Invalid assignment operator");
+                            error!(self.base, op, "Invalid assignment operator");
                             TokenType::Null
                         }
                     }
@@ -732,7 +733,7 @@ impl ASTTransformer {
                         "<<" => TokenType::ShiftLeft,
                         ">>" | ">>>" => TokenType::ShiftRight,
                         _ => {
-                            token_error!(self.base, op, "Invalid binary operator");
+                            error!(self.base, op, "Invalid binary operator");
                             TokenType::Null
                         }
                     }
@@ -783,7 +784,7 @@ impl ASTTransformer {
                     }
                 } 
 
-                token_error!(self.base, node_token, "Unsupported syntax");
+                error!(self.base, node_token, "Unsupported syntax");
                 make_null()
             }
             "ternary_expression" => {
@@ -816,7 +817,7 @@ impl ASTTransformer {
                             "++" => TokenType::PlusPlus,
                             "--" => TokenType::MinusMinus,
                             _ => {
-                                token_error!(self.base, op, "Invalid update operator");
+                                error!(self.base, op, "Invalid update operator");
                                 TokenType::Null
                             }
                         }
@@ -838,7 +839,7 @@ impl ASTTransformer {
                             "++" => TokenType::PlusPlus,
                             "--" => TokenType::MinusMinus,
                             _ => {
-                                token_error!(self.base, op, "Invalid update operator");
+                                error!(self.base, op, "Invalid update operator");
                                 TokenType::Null
                             }
                         }
@@ -865,7 +866,7 @@ impl ASTTransformer {
                         "!" => TokenType::Bang,
                         "~" => TokenType::Tilde,
                         _ => {
-                            token_error!(self.base, op, "Invalid unary operator");
+                            error!(self.base, op, "Invalid unary operator");
                             TokenType::Null
                         }
                     }
@@ -1151,7 +1152,7 @@ impl ASTTransformer {
                             catch_var.replace(catch_variable);
                         } else {
                             let tok = self.tok_from_node(&child);
-                            token_error!(self.base, tok, "Only one exception handler is supported");
+                            error!(self.base, tok, "Only one exception handler is supported");
                         }
                     } else {
                         let finally_block_node = child.child(1).unwrap();
@@ -1308,7 +1309,7 @@ impl ASTTransformer {
                     }
                 }
                 
-                token_error!(self.base, node_token, "Unsupported cast");
+                error!(self.base, node_token, "Unsupported cast");
                 make_null()
             }
             "lambda_expression" => {
@@ -1591,7 +1592,7 @@ impl ASTTransformer {
             }
             "yield_statement" | "module_declaration" | "template_expression" | 
             "try_with_resources_statement" | "static_initializer" => {
-                token_error!(self.base, node_token, "Unsupported syntax");
+                error!(self.base, node_token, "Unsupported syntax");
                 make_null()
             }
             _ => {
@@ -1612,7 +1613,7 @@ impl ASTTransformer {
         let mut expressions = Vec::new();
 
         if node.is_error() {
-            token_error!(self.base, tok, "Syntax error");
+            error!(self.base, tok, "Syntax error");
             return expressions;
         }
 
@@ -1632,9 +1633,10 @@ impl ASTTransformer {
 }
 
 language_layer! {
+    language = java;
     extension = "java";
 
-    java::process(source, filename) {
+    process(source, filename) {
         use tree_sitter::Parser;
         use crate::language_layers::java;
 
