@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use tree_sitter::Node;
 
-use crate::{ast_error, language_layer, token_error, token_warning, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField}, tokens::{Token, TokenType}}, utils::{lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer}, substring}};
+use crate::{ast_error, language_layer, token_error, token_warning, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField}, tokens::{Token, TokenType}}, univm::object::{AnonObject, UniLValue}, utils::{lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer}, substring}};
 
 struct Environment {
     pub names: HashSet<Rc<str>>,
@@ -56,7 +56,7 @@ pub struct ASTTransformer {
     
     last_label: Option<Rc<str>>,
 
-    in_sort_decl: bool,
+    in_sort_decl: Option<HashMap<Rc<str>, Expression>>,
     ignore_super: bool,
     arrayv: bool,
 }
@@ -70,7 +70,7 @@ impl ASTTransformer {
             curr_class_fields: None,
             last_label: None,
             
-            in_sort_decl: false,
+            in_sort_decl: None,
             ignore_super: false,
             arrayv: false,
         }
@@ -288,6 +288,28 @@ impl ASTTransformer {
         }
     }
 
+    async fn get_arguments(&mut self, node: &Node<'_>, ctx: &mut reblessive::Stk) -> Vec<Expression> {
+        assert_eq!("argument_list", node.kind());
+
+        let mut output = Vec::new();
+
+        let mut i = 1;
+        loop {
+            let arg_node = node.child(i).unwrap();
+            let text = self.text_from_node(&arg_node);
+            if text.as_ref() == ")" {
+                break;
+            }
+
+            let arg = ctx.run(|ctx| self.transform_one(&arg_node, ctx)).await;
+            output.push(arg);
+
+            i += 1;
+        }
+
+        output
+    }
+
     async fn transform_one(&mut self, node: &Node<'_>, ctx: &mut reblessive::Stk) -> Expression {
         let node_token = self.tok_from_node(node);
         
@@ -327,7 +349,7 @@ impl ASTTransformer {
                 ctx.run(|ctx| self.transform_one(&body_node, ctx)).await
             }
             "decimal_integer_literal" => {
-                let value = self.text_from_node(&node.child(0).unwrap());
+                let value = self.text_from_node(&node);
                 Expression::Literal { value, tok: node_token, kind: LiteralKind::Int }
             }
             "hex_integer_literal" => {
@@ -525,7 +547,7 @@ impl ASTTransformer {
                         if superclass_name.lexeme.as_ref() == "Thread" {
                             todo!();
                         } else if self.arrayv && superclass_name.lexeme.as_ref() == "Sort" {
-                            self.in_sort_decl = true;
+                            self.in_sort_decl = Some(HashMap::new());
                         }
                     } 
 
@@ -553,8 +575,10 @@ impl ASTTransformer {
                 let tok = self.tok_from_node_with_type(node, TokenType::Walrus);
                 let object = Expression::AnonObject { kw: tok.clone(), fields };
 
+                let info = self.in_sort_decl.take();
+
                 if let Some(constructor_fn) = constructor {
-                    if self.in_sort_decl {
+                    if let Some(info) = info {
                         todo!("sort postprocessing"); 
                     }
 
@@ -594,8 +618,6 @@ impl ASTTransformer {
                         body: vec![object] 
                     });
                 }
-
-                self.in_sort_decl = false;
 
                 // removes static variables declarations, which would get turned into globals without namespaces
                 definitions.retain(|x| !matches!(x, Expression::Assign { .. }));
@@ -1330,7 +1352,7 @@ impl ASTTransformer {
                 }
             }
             "constructor_body" => {
-                self.ignore_super = self.in_sort_decl;
+                self.ignore_super = self.in_sort_decl.is_some();
 
                 let mut expressions = Vec::new();
                 
@@ -1357,7 +1379,71 @@ impl ASTTransformer {
                 todo!()
             }
             "method_invocation" => {
-                todo!()
+                if self.in_sort_decl.is_some() {
+                    let name_node = node.child_by_field_name("name").unwrap();
+                    let name_expr = ctx.run(|ctx| self.transform_one(&name_node, ctx)).await;
+                    let name = get_token_from_variable(name_expr);
+
+                    let args_node = node.child_by_field_name("arguments").unwrap();
+                    let args: Vec<Expression> = ctx.run(|ctx| self.get_arguments(&args_node, ctx)).await;
+
+                    if let Some(info) = &mut self.in_sort_decl {
+                        // handles ArrayV declarations
+                        match name.lexeme.as_ref() {
+                            "setSortListName" | 
+                            "setRunSortName" |
+                            "setCategory" => {
+                                if args.len() != 1 {
+                                    todo!("error")
+                                }
+
+                                info.insert(
+                                    Rc::from({
+                                        match name.lexeme.as_ref() {
+                                            "setSortListName" => "listName",
+                                            "setRunSortName" => "name",
+                                            "setCategory" => "category",
+                                            _ => unreachable!()
+                                        }
+                                    }),
+                                    args[0].clone()
+                                );
+                            }
+                            // interactive:
+                            "setUnreasonableLimit" => {
+                                if args.len() != 1 {
+                                    todo!("error")
+                                }
+
+                                if let Expression::Literal { value, kind, .. } = &args[0] {
+                                    if matches!(kind, LiteralKind::Int) && value.as_ref() == "0" {
+                                        return make_null();
+                                    }
+                                }
+
+                                todo!()
+                            }
+                            "setQuestion" => {
+                                todo!()
+                            }
+                            // ignored:
+                            "setRunAllSortsName" | 
+                            "setBucketSort" | 
+                            "setRadixSort" |
+                            "setUnreasonablySlow" |
+                            "setBogoSort" => (),
+                            _ => {
+                                todo!("warning: unsupported method call");
+                            }
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                    
+                    make_null()
+                } else {
+                    todo!()
+                }
             }
             "method_reference" => {
                 todo!()
