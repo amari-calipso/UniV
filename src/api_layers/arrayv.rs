@@ -1,6 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{api_field_def_fn, api_fn_body, api_fn_obj, api_layer, api_layers::osv::delay, univm::object::{AnonObject, UniLValue}};
+use crate::{api_field_def_fn, api_field_typedef_fn, api_fn_body, api_fn_obj, api_fn_types, api_layer, api_layers::osv::delay, compiler::type_system::UniLType, univm::object::{AnonObject, UniLValue}};
 use crate::api_layers::osv::{clearMark, markArray};
 
 api_fn_body! {
@@ -31,7 +31,7 @@ api_fn_body! {
 }
 
 api_fn_body! {
-    write(args, [UniLType::Any, UniLType::List, integer_type(), UniLType::Any, number_type(), UniLType::Int, UniLType::Int], univ, task) -> (UniLType::Int) {
+    write(args, [UniLType::Any, UniLType::List, integer_type(), UniLType::Any, number_type(), UniLType::Int, UniLType::Int], univ, task) -> (UniLType::Any) {
         // TODO: consider custom delay and whether to show or not
         args.remove(0);
         args.pop();
@@ -48,26 +48,74 @@ api_fn_body! {
 
 api_layer! {
     definitions(globals) {
-        let mut highlights = AnonObject::new();
-        api_field_def_fn!(highlights, markArray);
-        api_field_def_fn!(highlights, clearMark);
+        // Highlights
+        {
+            let mut highlights = AnonObject::new();
+            api_field_def_fn!(highlights, markArray);
+            api_field_def_fn!(highlights, clearMark);
+            
+            globals.define(&Rc::from("Highlights"), UniLValue::Object(Rc::new(RefCell::new(highlights.into()))));
+        }
         
-        globals.define(&Rc::from("Highlights"), UniLValue::Object(Rc::new(RefCell::new(highlights.into()))));
+        // Delays
+        {
+            let mut delays = AnonObject::new();
+            delays.set(&Rc::from("sleep"), api_fn_obj!(delay));
 
-        let mut delays = AnonObject::new();
-        delays.set(&Rc::from("sleep"), api_fn_obj!(delay));
-
-        globals.define(&Rc::from("Delays"), UniLValue::Object(Rc::new(RefCell::new(delays.into()))));
-
-        let mut reads = AnonObject::new();
-        api_field_def_fn!(reads, compareValues);
-        api_field_def_fn!(reads, compareIndexValue);
-
-        globals.define(&Rc::from("Reads"), UniLValue::Object(Rc::new(RefCell::new(reads.into()))));
+            globals.define(&Rc::from("Delays"), UniLValue::Object(Rc::new(RefCell::new(delays.into()))));
+        }
         
-        let mut writes = AnonObject::new();
-        api_field_def_fn!(writes, write);
+        // Reads
+        {
+            let mut reads = AnonObject::new();
+            api_field_def_fn!(reads, compareValues);
+            api_field_def_fn!(reads, compareIndexValue);
 
-        globals.define(&Rc::from("Writes"), UniLValue::Object(Rc::new(RefCell::new(writes.into()))));
+            globals.define(&Rc::from("Reads"), UniLValue::Object(Rc::new(RefCell::new(reads.into()))));
+        }
+        
+        // Writes
+        {
+            let mut writes = AnonObject::new();
+            api_field_def_fn!(writes, write);
+
+            globals.define(&Rc::from("Writes"), UniLValue::Object(Rc::new(RefCell::new(writes.into()))));
+        }
+    }
+
+    types(globals) {
+        // Highlights
+        {
+            let mut highlights = HashMap::new();
+            api_field_typedef_fn!(highlights, markArray);
+            api_field_typedef_fn!(highlights, clearMark);
+            
+            globals.define(&Rc::from("Highlights"), UniLType::Object { fields: Rc::new(RefCell::new(highlights)) });
+        }
+        
+        // Delays
+        {
+            let mut delays = HashMap::new();
+            delays.insert(Rc::from("sleep"), api_fn_types!(delay));
+
+            globals.define(&Rc::from("Delays"), UniLType::Object { fields: Rc::new(RefCell::new(delays)) });
+        }
+        
+        // Reads
+        {
+            let mut reads = HashMap::new();
+            api_field_typedef_fn!(reads, compareValues);
+            api_field_typedef_fn!(reads, compareIndexValue);
+
+            globals.define(&Rc::from("Reads"), UniLType::Object { fields: Rc::new(RefCell::new(reads)) });
+        }
+        
+        // Writes
+        {
+            let mut writes = HashMap::new();
+            api_field_typedef_fn!(writes, write);
+
+            globals.define(&Rc::from("Writes"), UniLType::Object { fields: Rc::new(RefCell::new(writes)) });
+        }
     }
 }
