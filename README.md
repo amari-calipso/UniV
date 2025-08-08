@@ -590,7 +590,7 @@ Writing algorithms using tier 2 support languages is possible with some issues. 
 Writing algorithms using tier 3 support languages is not reliable. Support for language constructs might be low or inconsistent. UniV might give unhelpful error messages. If this layers implements compatibility for the API of another visualization program, visualization fidelity is low: animations might not be accurate to the original ones. Nonetheless, it's possible to run some algorithms that are already proven to be correct in the original environment.
 
 #### Tier 4 - Low support
-Writing algorithms using tier 3 support languages is highly discouraged. Support for language constructs and visualization fidelity is the same as tier 3. Expect unhelpful error messages. It's only possible to run simple algorithms using this layer, everything else is not guaranteed.
+Writing algorithms using tier 4 support languages is highly discouraged. Support for language constructs and visualization fidelity is the same as tier 3. Expect unhelpful error messages. It's only possible to run simple algorithms using this layer, everything else is not guaranteed.
 
 #### Tier 5 - Experimental support
 Support for this language is experimental. Tier 5 support layers are not suitable for use, but only for small experiments. Don't expect anything to work correctly, and expect potential crashes.
