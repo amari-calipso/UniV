@@ -1485,7 +1485,7 @@ impl ASTTransformer {
                     let name = get_token_from_variable(name_expr);
 
                     let args_node = node.child_by_field_name("arguments").unwrap();
-                    let args: Vec<Expression> = ctx.run(|ctx| self.get_arguments(&args_node, ctx)).await;
+                    let args = ctx.run(|ctx| self.get_arguments(&args_node, ctx)).await;
 
                     if let Some(info) = &mut self.curr_sort_decl {
                         // handles ArrayV declarations
