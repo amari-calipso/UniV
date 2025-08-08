@@ -574,7 +574,30 @@ fn mySort(array: List) Null {
 ```
 
 ## Third party language support
+
+UniV can support multiple programming languages (and other visualizers' APIs) due to its language and API compatibility layers. Support for external languages is not easy though, as it requires a translation layer for each of the languages it supports. Thankfully, this process is simplified by UniL's "universal" design, that grants access to enough building blocks to implement most of the features necessary to run array manipulation algorithms on modern programming languages, but this doesn't mean that it's trivial to have support for every language ever created. For this reason UniV provides *support tiers*, to give a clear indication of "how supported" a language is.
+
+#### Tier 0 - Native support
+You will get the best experience writing algorithms in languages in this tier. Everything is supported: every construct, every function of the API, all of it. Error messages are clear and make sense in the context of this language. Only UniL, the native UniV language, currently has tier 0 support.
+
+#### Tier 1 - High support
+Writing algorithms using tier 1 support languages is possible with no issues. Most of the constructs are supported, although some less used features might be missing. UniV is able to give helpful error messages, even though they might not be the same as the original language. If this layer implements compatibility for the API of another visualization program, visualization fidelity is high: animations will look almost identical to the original program.
+
+#### Tier 2 - Medium support
+Writing algorithms using tier 2 support languages is possible with some issues. The necessary constructs for algorithms are supported, but it's not hard to bump into something unsupported. Nonetheless, there is enough tooling to write an array algorithm without too many problems. Error reporting and visual fidelity is the same as tier 1.
+
+#### Tier 3 - Baseline support
+Writing algorithms using tier 3 support languages is not reliable. Support for language constructs might be low or inconsistent. UniV might give unhelpful error messages. If this layers implements compatibility for the API of another visualization program, visualization fidelity is low: animations might not be accurate to the original ones. Nonetheless, it's possible to run some algorithms that are already proven to be correct in the original environment.
+
+#### Tier 4 - Low support
+Writing algorithms using tier 3 support languages is highly discouraged. Support for language constructs and visualization fidelity is the same as tier 3. Expect unhelpful error messages. It's only possible to run simple algorithms using this layer, everything else is not guaranteed.
+
+#### Tier 5 - Experimental support
+Support for this language is experimental. Tier 5 support layers are not suitable for use, but only for small experiments. Don't expect anything to work correctly, and expect potential crashes.
+
 ### Python
+The Python compatibility layer currently has [Tier 2](#tier-2---medium-support) support. The Python layer implements compatibility with the [oSV API](https://github.com/amari-calipso/sorting-visualizer).
+
 #### What is supported and what is not supported
 The following Python constructs are not currently supported:
 - Keyword parameters
@@ -615,6 +638,7 @@ from ...headers.UniV import *
 ```
 ### Java
 Java support is in the works, stay tuned!
+
 ## Adding visual styles
 Visual styles have to be added from UniV's source code, due to performance constraints. You can add one by creating a file in the `src/visuals` folder, then, create a type that has the same name of the file, but PascalCase (for example: `my_visual.rs` contains `struct MyVisual`). Now you can choose to either manually implement the `Visual` trait on your struct, or use the `visual!` macro to simplify the process. The `Visual` trait provides documentation on what each of the method does.
 
