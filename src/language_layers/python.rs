@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
-use alanglib::{ast::SourcePos, report::warning};
+use alanglib::ast::SourcePos;
 use libcst_native::{deflated::{AnnAssign, Arg, Assert, Assign, AssignTarget, AssignTargetExpression, Attribute, AugAssign, AugOp, BaseSlice, BinaryOp, BinaryOperation, BooleanOp, BooleanOperation, Break, Call, ClassDef, CompOp, Comparison, CompoundStatement, ConcatenatedString, Continue, Del, DelTargetExpression, Dict, DictElement, Element, Expr, Float, For, FunctionDef, If, IfExp, IndentedBlock, Index, Integer, Lambda, List, Match, MatchCase, MatchPattern, Module, Name, OrElse, Parameters, Raise, Return, SimpleStatementLine, SimpleStatementSuite, SimpleString, SmallStatement, Statement, Subscript, SubscriptElement, Suite, Try, TryStar, Tuple, TypeAlias, UnaryOp, UnaryOperation, While, With}, tokenizer::TokType};
 
-use crate::{error, language_layer, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer, Transform}};
+use crate::{error, language_layer, unil::{ast::{Expression, LiteralKind, NamedExpr, ObjectField, SwitchCase}, tokens::{Token, TokenType}}, utils::lang::{get_token_from_variable, get_vec_of_expr_from_block, make_null, BaseASTTransformer, Transform}, warning};
 
 pub struct ASTTransformer {
     base: BaseASTTransformer,
@@ -188,7 +188,7 @@ impl Transform for FunctionDef<'_, '_> {
         let def_tok = t.tok(self.def_tok);
 
         if t.base.depth != 0 {
-            warning(&def_tok, "Closures are not supported. This function will be defined in the global scope");
+            warning!(&def_tok, "Closures are not supported. This function will be defined in the global scope");
         }
 
         t.base.inc_depth();
@@ -819,12 +819,12 @@ impl Transform for ClassDef<'_, '_> {
     fn to_ast(&self, t: &mut Self::Transformer) -> Expression {
         if !self.decorators.is_empty() {
             let tok = t.tok(self.decorators.first().unwrap().at_tok);
-            warning(&tok, "Decorators are not supported on classes. Ignoring");
+            warning!(&tok, "Decorators are not supported on classes. Ignoring");
         }
 
         if !self.keywords.is_empty() || !self.bases.is_empty() {
             let tok = t.tok(self.class_tok);
-            warning(&tok, "Inheritance is not supported. Ignoring");
+            warning!(&tok, "Inheritance is not supported. Ignoring");
         }
 
         let class_name = get_token_from_variable(self.name.to_ast(t));
@@ -2108,7 +2108,7 @@ impl Transform for Lambda<'_, '_> {
         let lambda_tok = t.tok(self.lambda_tok);
 
         if t.base.depth != 0 {
-            warning(&lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
+            warning!(&lambda_tok, "Closures are not supported. This lambda will be defined in the global scope");
         }
 
         t.base.inc_depth();

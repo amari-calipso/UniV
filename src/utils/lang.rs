@@ -33,6 +33,24 @@ macro_rules! error {
     };
 }
 
+#[macro_export]
+macro_rules! warning {
+    ($e: expr, $msg: expr) => {
+        {
+            println!("{}", alanglib::report::warning($e, $msg));
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! note {
+    ($e: expr, $msg: expr) => {
+        {
+            println!("{}", alanglib::report::note($e, $msg));
+        }
+    };
+}
+
 #[allow(dead_code)]
 pub fn make_null() -> Expression {
     Expression::Literal {
