@@ -356,10 +356,12 @@ impl Compiler {
                 ctx.run(|ctx| self.compile_one(&body, ctx)).await;
 
                 ctx.run(|ctx| self.compile_one(&condition, ctx)).await;
+                let jump_to_begin = self.output.instructions.len();
                 self.push_instruction(Instruction::Null, &condition); // placeholder
+                self.push_instruction(Instruction::Pop, expr); // gets rid of the value from last iteration (only when we start a new one)
                 self.push_instruction(Instruction::Jmp(start_of_while_idx), expr);
                 let end_of_while_idx = self.output.instructions.len() as u64;
-                self.output.instructions[end_of_while_idx as usize - 2] = Instruction::IfNotJmp(end_of_while_idx);
+                self.output.instructions[jump_to_begin] = Instruction::IfNotJmp(end_of_while_idx);
 
                 for &break_idx in &self.curr_loop.as_ref().unwrap().break_indices {
                     self.output.instructions[break_idx] = Instruction::Jmp(end_of_while_idx);
