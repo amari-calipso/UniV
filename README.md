@@ -22,7 +22,8 @@ Jump to [releases](https://github.com/amari-calipso/UniV/releases) if you just w
 
 If you're running or building from source, make sure that your machine has installed:
 - [raylib's dependencies](https://github.com/raysan5/raylib/wiki);
-- [CMake](https://cmake.org/) (note that release candidate versions, marked as "rc", might not work);
+- [raylib-rs's dependencies](https://github.com/raylib-rs/raylib-rs?tab=readme-ov-file#build-dependencies);
+    - Note that release candidate versions of [CMake](https://cmake.org/), marked as "rc", might not work.
 - libclang (if you're on Windows, you can download [LLVM](https://releases.llvm.org/download.html), which contains libclang);
 
 To run or build from source, clone the repository first, then you have two options:
