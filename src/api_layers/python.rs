@@ -130,6 +130,21 @@ api_fn_body! {
     }
 }
 
+api_fn_body! {
+    Python_input1(args, [UniLType::String], univ, task) -> (UniLType::String) {
+        args.push(UniLValue::String(Rc::from("")));
+        args.push(univ.vm.get_global("asAny")?);
+        crate::api_layers::univ::UniV_getUserInput::func(univ, args, task)
+    }
+}
+
+api_fn_body! {
+    Python_input0(args, [], univ, task) -> (UniLType::String) {
+        args.push(UniLValue::String(Rc::from("<no message provided>")));
+        crate::api_layers::python::Python_input1::func(univ, args, task)
+    }
+}
+
 api_layer! {
     definitions(globals) {
         globals.define(&Rc::from("True"), UniLValue::Int(1));
@@ -146,6 +161,8 @@ api_layer! {
         api_def_fn!(globals, Python_int);
         api_def_fn!(globals, Python_float);
         api_def_fn!(globals, Python_abs);
+        api_def_fn!(globals, Python_input0);
+        api_def_fn!(globals, Python_input1);
 
         let mut math = AnonObject::new();
         math.set(&Rc::from("pi"),    UniLValue::Float(std::f64::consts::PI));
@@ -176,6 +193,8 @@ api_layer! {
         api_typedef_fn!(globals, Python_int);
         api_typedef_fn!(globals, Python_float);
         api_typedef_fn!(globals, Python_abs);
+        api_typedef_fn!(globals, Python_input0);
+        api_typedef_fn!(globals, Python_input1);
         
         let mut math = HashMap::new();
         math.insert(Rc::from("ceil"),  api_fn_types!(math_ceil));

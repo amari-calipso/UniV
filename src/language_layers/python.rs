@@ -2059,6 +2059,15 @@ impl Transform for Call<'_, '_> {
                         }
                     }) });
                 }
+                "input" => {
+                    callee = Box::new(Expression::Variable { name: t.tok_with_lexeme(self.lpar_tok, {
+                        match self.args.len() {
+                            0 => "Python_input0",
+                            1 => "Python_input1",
+                            _ => "input"
+                        }
+                    }) });
+                }
                 _ => ()
             }
         }
