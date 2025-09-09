@@ -440,7 +440,7 @@ impl<'a> Scanner<'a> {
                     self.identifier();
                 } else {
                     let c: Rc<str> = Rc::from(c);
-                    self.error(format!("Unexpected character '{}'", c).as_str());
+                    self.error(format!("Unexpected character '{}' ({:?})", c, c.as_bytes()).as_str());
                 }
             }
         }

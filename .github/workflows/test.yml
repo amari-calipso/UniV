@@ -1,0 +1,28 @@
+name: Basic test
+
+on: [push]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            rust_toolchain: stable
+          - os: macos-latest
+            rust_toolchain: stable
+          - os: windows-latest
+            rust_toolchain: stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup toolchain
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+
+      - name: Compile algorithms and generate headers
+        run: RUST_BACKTRACE=full cargo run --features dev -- --compile-algos --with-headers
