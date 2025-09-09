@@ -281,8 +281,8 @@ impl Scanner {
     }
 
     fn scan_token(&mut self) {
-        let c = self.advance();
-        match c {
+        let c: Rc<str> = Rc::from(self.advance());
+        match c.as_ref() {
             "{" => self.add_token(TokenType::LeftBrace),
             "}" => self.add_token(TokenType::RightBrace),
             
@@ -296,19 +296,19 @@ impl Scanner {
                         self.advance();
                     }
                 } else {
-                    self.error("Unexpected character");
+                    self.error(format!("Unexpected character '{}'", c).as_str());
                 }
             }
 
             "0" => self.alt_base_number(),
 
             _ => {
-                if is_str_beginning_digit(c) {
+                if is_str_beginning_digit(c.as_ref()) {
                     self.number(true);
-                } else if is_str_alpha(c) {
+                } else if is_str_alpha(c.as_ref()) {
                     self.identifier();
                 } else {
-                    self.error("Unexpected character");
+                    self.error(format!("Unexpected character '{}'", c).as_str());
                 }
             }
         }

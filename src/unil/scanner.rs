@@ -439,7 +439,8 @@ impl<'a> Scanner<'a> {
                 } else if is_str_alpha(c) {
                     self.identifier();
                 } else {
-                    self.error("Unexpected character");
+                    let c: Rc<str> = Rc::from(c);
+                    self.error(format!("Unexpected character '{}'", c).as_str());
                 }
             }
         }
