@@ -1,18 +1,17 @@
-name: Basic test
+name: Basic test on macOS
 
 on: [push]
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test on macOS
+    runs-on: [macos-latest, macos-13]
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
         include:
-          - os: ubuntu-latest
-            rust_toolchain: stable
           - os: macos-latest
+            rust_toolchain: stable
+          - os: macos-13
             rust_toolchain: stable
     steps:
       - uses: actions/checkout@v4

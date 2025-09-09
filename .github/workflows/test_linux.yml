@@ -1,0 +1,26 @@
+name: Basic test on Linux
+
+on: [push]
+
+jobs:
+  test:
+    name: Test on Linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rust_toolchain: stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup toolchain
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install build-essential libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
+
+      - name: Compile UniV with algorithms and generate headers
+        run: RUST_BACKTRACE=full cargo run --features dev -- --compile-algos --with-headers
