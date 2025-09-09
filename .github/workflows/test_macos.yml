@@ -5,9 +5,10 @@ on: [push]
 jobs:
   test:
     name: Test on macOS
-    runs-on: [macos-latest, macos-13]
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [macos-latest, macos-13]
         include:
           - os: macos-latest
             rust_toolchain: stable
