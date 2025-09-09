@@ -1,6 +1,6 @@
 [package]
 name = "univ"
-version = "2025.9.5"
+version = "2025.9.10"
 edition = "2024"
 
 [profile.dev]
@@ -48,7 +48,8 @@ flate2 = { version = "1.1.2", optional = true }
 reblessive = "0.4.1"
 num-format = "0.4.4"
 ordered-float = "5.0.0"
-alanglib = { git = "https://github.com/amari-calipso/alanglib.git", features = ["report_buf"] }
+unicode-segmentation = "1.12.0"
+alanglib = { version = "2025.9.10", git = "https://github.com/amari-calipso/alanglib.git", features = ["report_buf"] }
 
 # parsers
 libcst = { git = "https://github.com/amari-calipso/LibCST.git", version = "1.7.0", default-features = false, optional = true }
