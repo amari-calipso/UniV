@@ -288,7 +288,7 @@ impl Scanner {
             
             "\""  => self.string_literal("\""),
             " " | "\r" | "\t" => (),
-            "\n" => self.newline(),
+            "\n" | "\r\n" => self.newline(),
 
             "/" => {
                 if self.match_("/") {

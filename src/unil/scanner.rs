@@ -429,7 +429,7 @@ impl<'a> Scanner<'a> {
             "\""  => self.string_literal("\""),
             "'" => self.string_literal("'"),
             " " | "\r" | "\t" => (),
-            "\n" => self.newline(),
+            "\n" | "\r\n" => self.newline(),
 
             "0" => self.alt_base_number(),
 
@@ -440,7 +440,7 @@ impl<'a> Scanner<'a> {
                     self.identifier();
                 } else {
                     let c: Rc<str> = Rc::from(c);
-                    self.error(format!("Unexpected character '{}' ({:?})", c, c.as_bytes()).as_str());
+                    self.error(format!("Unexpected character '{}'", c).as_str());
                 }
             }
         }
