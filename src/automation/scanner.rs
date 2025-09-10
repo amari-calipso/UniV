@@ -74,7 +74,7 @@ impl Scanner {
 
     fn advance(&mut self) -> &str {
         let c = self.source.graphemes(true).nth(self.curr).unwrap();
-        self.curr += 1;
+        self.curr += c.chars().count();
         c
     }
 
@@ -98,7 +98,7 @@ impl Scanner {
             return false;
         }
 
-        self.curr += 1;
+        self.curr += expected.chars().count();
         true
     }
 
