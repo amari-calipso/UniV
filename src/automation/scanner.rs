@@ -1,8 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
-use alanglib::{ast::SourcePos, report::error_pos, scanner::{is_str_alpha, is_str_alphanumeric, is_str_beginning_digit, is_str_bin_digit, is_str_digit, is_str_hex_digit, is_str_oct_digit, substring}};
+use alanglib::{ast::SourcePos, report::error_pos, scanner::{is_alpha, is_alphanumeric, is_beginning_digit, is_bin_digit, is_digit, is_hex_digit, is_oct_digit, substring}};
 use lazy_static::lazy_static;
-use unicode_segmentation::UnicodeSegmentation;
 
 use super::tokens::{Token, TokenType};
 
@@ -43,12 +42,11 @@ pub struct Scanner {
     source: Rc<str>,
     filename: Rc<str>,
     pub tokens: Vec<Token>,
+    start_positions: Vec<usize>,
 
-    start:      usize,
-    curr:       usize,
-    line:       usize,
-    start_line: usize,
-    max_pos:    usize,
+    start: usize,
+    curr:  usize,
+    line:  usize,
 
     pub errors: Vec<String>,
 }
@@ -56,25 +54,18 @@ pub struct Scanner {
 impl Scanner {
     pub fn new(source: Rc<str>, filename: Rc<str>) -> Self {
         Scanner {
-            max_pos: source.graphemes(true).count(),
-            source, 
-            filename, 
-            tokens: Vec::new(), 
-            start: 0, 
-            curr: 0, 
-            line: 0,
-            start_line: 1,
-            errors: Vec::new()
+            source, filename, tokens: Vec::new(), start_positions: Vec::new(),
+            start: 0, curr: 0, line: 0, errors: Vec::new()
         }
     }
 
     fn is_at_end(&self) -> bool {
-        self.curr >= self.max_pos
+        self.curr >= self.source.len()
     }
 
-    fn advance(&mut self) -> &str {
-        let c = self.source.graphemes(true).nth(self.curr).unwrap();
-        self.curr += c.chars().count();
+    fn advance(&mut self) -> char {
+        let c = self.source.chars().nth(self.curr).unwrap();
+        self.curr += 1;
         c
     }
 
@@ -83,36 +74,30 @@ impl Scanner {
             Rc::from(self.source.as_ref()),
             Rc::clone(&self.filename), type_,
             substring(&self.source.to_string(), self.start, self.curr).into(),
-            self.start_line - 1,
-            self.start_line - 1 + self.curr.saturating_sub(self.start), 
-            self.line
+            self.start.saturating_sub(self.start_positions[self.line]),
+            self.curr.saturating_sub(self.start_positions[self.line]), self.line
         ));
     }
 
-    fn match_(&mut self, expected: &str) -> bool {
+    fn match_(&mut self, expected: char) -> bool {
         if self.is_at_end() {
             return false;
         }
 
-        if self.source.graphemes(true).nth(self.curr).unwrap() != expected {
+        if self.source.chars().nth(self.curr).unwrap() != expected {
             return false;
         }
 
-        self.curr += expected.chars().count();
+        self.curr += 1;
         true
     }
 
-    fn peek(&self) -> &str {
+    fn peek(&self) -> char {
         if self.is_at_end() {
-            "\0"
+            '\0'
         } else {
-            self.source.graphemes(true).nth(self.curr).unwrap()
+            self.source.chars().nth(self.curr).unwrap()
         }
-    }
-
-    fn newline(&mut self) {
-        self.line += 1;
-        self.start_line = 0;
     }
 
     fn error(&mut self, msg: &str) {
@@ -120,15 +105,14 @@ impl Scanner {
             &SourcePos::new(
                 Rc::clone(&self.source),
                 Rc::clone(&self.filename),
-                self.start_line - 1,
-                self.start_line - 1 + self.curr.saturating_sub(self.start), 
-                self.line
+                self.start.saturating_sub(self.start_positions[self.line]),
+                self.curr.saturating_sub(self.start), self.line
             ),
             msg
         ));
     }
 
-    fn string_literal(&mut self, ch: &str) {
+    fn string_literal(&mut self, ch: char) {
         let mut back_slash = false;
         loop {
             let c = self.peek();
@@ -140,8 +124,8 @@ impl Scanner {
             back_slash = false;
 
             match c {
-                "\n" => self.newline(),
-                "\\" => {
+                '\n' => self.line += 1,
+                '\\' => {
                     if !old_backslash {
                         back_slash = true;
                     }
@@ -170,20 +154,20 @@ impl Scanner {
 
     fn number(&mut self, scan_start: bool) {
         if scan_start {
-            while is_str_digit(self.peek()) {
+            while is_digit(self.peek()) {
                 self.advance();
             }
         }
 
         let c = self.peek();
-        if c == "." {
+        if c == '.' {
             self.advance();
 
-                if is_str_digit(self.peek()) {
+                if is_digit(self.peek()) {
                     loop {
                         self.advance();
 
-                        if !is_str_digit(self.peek()) {
+                        if !is_digit(self.peek()) {
                             break;
                         }
                     }
@@ -199,7 +183,7 @@ impl Scanner {
 
     fn add_int_token_with_base_conversion(&mut self, base: u32) {
         self.tokens.push(Token::new(
-            Rc::clone(&self.source),
+            Rc::from(self.source.as_ref()),
             Rc::clone(&self.filename), TokenType::Int,
             format!(
                 "{}",
@@ -208,48 +192,47 @@ impl Scanner {
                     base
                 ).expect("Scanner failed scanning alt base number")
             ).into(),
-            self.start_line - 1,
-            self.start_line - 1 + self.curr.saturating_sub(self.start), 
-            self.line
+            self.start.saturating_sub(self.start_positions[self.line]),
+            self.curr.saturating_sub(self.start_positions[self.line]), self.line
         ));
     }
 
     fn alt_base_number(&mut self) {
         let c = self.peek();
         match c {
-            "b" => {
+            'b' => {
                 self.advance();
 
-                while is_str_bin_digit(self.peek()) {
+                while is_bin_digit(self.peek()) {
                     self.advance();
                 }
 
                 self.add_int_token_with_base_conversion(2);
             }
-            "o" => {
+            'o' => {
                 self.advance();
 
-                while is_str_oct_digit(self.peek()) {
+                while is_oct_digit(self.peek()) {
                     self.advance();
                 }
 
                 self.add_int_token_with_base_conversion(8);
             }
-            "x" => {
+            'x' => {
                 self.advance();
 
-                while is_str_hex_digit(self.peek()) {
+                while is_hex_digit(self.peek()) {
                     self.advance();
                 }
 
                 self.add_int_token_with_base_conversion(16);
             }
             _ => {
-                if is_str_digit(c) {
+                if is_digit(c) {
                     loop {
                         self.advance();
 
-                        if !is_str_digit(self.peek()) {
+                        if !is_digit(self.peek()) {
                             break;
                         }
                     }
@@ -264,7 +247,7 @@ impl Scanner {
     }
 
     fn identifier(&mut self) {
-        while is_str_alphanumeric(self.peek()) {
+        while is_alphanumeric(self.peek()) {
             self.advance();
         }
 
@@ -281,42 +264,52 @@ impl Scanner {
     }
 
     fn scan_token(&mut self) {
-        let c: Rc<str> = Rc::from(self.advance());
-        match c.as_ref() {
-            "{" => self.add_token(TokenType::LeftBrace),
-            "}" => self.add_token(TokenType::RightBrace),
+        let c = self.advance();
+        match c {
+            '{' => self.add_token(TokenType::LeftBrace),
+            '}' => self.add_token(TokenType::RightBrace),
             
-            "\""  => self.string_literal("\""),
-            " " | "\r" | "\t" => (),
-            "\n" | "\r\n" => self.newline(),
+            '"'  => self.string_literal('"'),
+            ' ' | '\r' | '\t' => (),
+            '\n' => self.line += 1,
 
-            "/" => {
-                if self.match_("/") {
-                    while self.peek() != "\n" && !self.is_at_end() {
+            '/' => {
+                if self.match_('/') {
+                    while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
                 } else {
-                    self.error(format!("Unexpected character '{}'", c).as_str());
+                    self.error("Unexpected character");
                 }
             }
 
-            "0" => self.alt_base_number(),
+            '0' => self.alt_base_number(),
 
             _ => {
-                if is_str_beginning_digit(c.as_ref()) {
+                if is_beginning_digit(c) {
                     self.number(true);
-                } else if is_str_alpha(c.as_ref()) {
+                } else if is_alpha(c) {
                     self.identifier();
                 } else {
-                    self.error(format!("Unexpected character '{}'", c).as_str());
+                    self.error("Unexpected character");
                 }
             }
         }
     }
 
+    fn get_start_positions(&mut self) {
+        self.start_positions.push(0);
+        for (i, c) in self.source.chars().enumerate() {
+            if c == '\n' {
+                self.start_positions.push(i + 1);
+            }
+        }
+    }
+
     pub fn scan_tokens(&mut self) {
+        self.get_start_positions();
+
         while !self.is_at_end() {
-            self.start_line += self.curr - self.start;
             self.start = self.curr;
             self.scan_token();
         }
