@@ -2343,14 +2343,14 @@ language_layer! {
         let tokens = {
             match libcst_native::tokenize(&source_cloned) {
                 Ok(toks) => toks.into(),
-                Err(e) => return Err(vec![e.to_string()])
+                Err(e) => return Err(vec![format!("{}: {}", filename, e.to_string())])
             }
         };
 
         let root_node = {
             match libcst_native::parse_tokens_without_whitespace(&tokens, &source_cloned, None) {
                 Ok(node) => node,
-                Err(e) => return Err(vec![e.to_string()])
+                Err(e) => return Err(vec![format!("{}: {}", filename, e.to_string())])
             }
         };
 

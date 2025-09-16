@@ -2064,12 +2064,23 @@ impl UniV {
         self.try_load_current_profile();
     }
 
-    fn load_algo_folder(&mut self, folder: &str) -> Result<Vec<Expression>, Vec<Error>> {
+    fn load_algo_folder(&mut self, folder: &str) -> (Vec<Expression>, Vec<Error>) {
         let mut errors = Vec::new();
         let mut dir_ast = Vec::new();
 
         let full_path = program_dir!().join("algos").join(folder);
-        for file in fs::read_dir(&full_path).map_err(|e| vec![e])? {
+
+        let files = {
+            match fs::read_dir(&full_path) {
+                Ok(files) => files,
+                Err(e) => {
+                    errors.push(e);
+                    return (dir_ast, errors);
+                }
+            }
+        };
+        
+        for file in files {
             if let Err(e) = file {
                 errors.push(e);
                 continue;
@@ -2103,11 +2114,7 @@ impl UniV {
             }
         }
 
-        if errors.is_empty() {
-            Ok(dir_ast)
-        } else {
-            Err(errors)
-        }
+        (dir_ast, errors)
     }
 
     fn init_gui_algos(&mut self) {
@@ -2215,10 +2222,9 @@ impl UniV {
         };
 
         for type_ in ["utils", "distributions", "pivotSelections", "rotations", "shuffles", "sorts"] {
-            match self.load_algo_folder(type_) {
-                Ok(ast) => toplevel_ast.extend(ast),
-                Err(e) => errors.extend(e),
-            }
+            let (mut ast, mut e) = self.load_algo_folder(type_);
+            toplevel_ast.append(&mut ast);
+            errors.append(&mut e);
         }
 
         toplevel_ast
