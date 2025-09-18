@@ -1584,7 +1584,7 @@ impl UniV {
     }
 
     fn get_value_and_max_from_highlight(&self, highlight: &HighlightInfo) -> (i64, i64) {
-        if highlight.aux.is_some() && self.aux_arrays.len() != 0 {
+        if self.settings.show_aux && highlight.aux.is_some() && self.aux_arrays.len() != 0 {
             (self.shared.aux[highlight.idx].value, self.shared.aux_max)
         } else {
             (self.shared.array[highlight.idx].value, self.shared.array_max)
