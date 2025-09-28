@@ -62,7 +62,20 @@ impl Gui {
 
         self.file_dialog.selected = FileOption::None;
         ui.window(&self.file_dialog.title)
-            .size([600.0, 400.0], imgui::Condition::Appearing)
+            .position(
+                [
+                    self.resolution_x / 2.0 - self.medium_window_size_x / 2.0, 
+                    self.resolution_y / 2.0 - self.medium_window_size_y / 2.0
+                ], 
+                imgui::Condition::Always
+            )
+            .size(
+                [
+                    self.medium_window_size_x, 
+                    self.medium_window_size_y
+                ], 
+                imgui::Condition::Always
+            )
             .build(|| {
                 ui.child_window("Path Selection")
                     .horizontal_scrollbar(false)

@@ -4,7 +4,7 @@ use raylib::{RaylibHandle, RaylibThread};
 use rustysynth::SoundFont;
 use serde::{Deserialize, Serialize};
 
-use crate::{config_dir, gui::{FileOption, Gui}, univm::object::ExecutionInterrupt, sound, utils::sound::BaseSoundFontEngine, DEFAULT_SOUNDFONT};
+use crate::{config_dir, gui::{FileOption, Gui}, sound, sounds::default_engine, univm::object::ExecutionInterrupt, utils::sound::BaseSoundFontEngine, DEFAULT_SOUNDFONT};
 
 macro_rules! soundfont_config_file {
     () => {
@@ -103,9 +103,14 @@ sound! {
             };
 
             self.base.prepare(shared, soundfont, config.bank, config.preset);
-            return Ok(());
+        } else {
+            let soundfont = SoundFont::new(&mut Cursor::new(DEFAULT_SOUNDFONT))
+                .expect("Could not load default SoundFont");
+            self.base.prepare(shared, soundfont, default_engine::BANK, default_engine::PRESET);
         }
+    }
 
+    config(shared, gui, rl, thread) {
         gui.build_fn = Gui::popup;
         gui.popup.set("Soundfont sound engine", "Select soundfont file to load").unwrap();
         gui.run(rl, thread)?;

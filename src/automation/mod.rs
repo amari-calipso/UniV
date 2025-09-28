@@ -97,7 +97,7 @@ impl AutomationInterpreter {
 
 impl UniV {
     fn write_to_timestamp_file_inner(&mut self, text: &str) -> Result<(), Error> {
-        if let Some(file) = self.render.timestamp_file.get_mut() {
+        if let Some(file) = &mut self.render.timestamp_file {
             file.write_all(duration_to_hms(&self.render.recording_duration).as_bytes())?;
             file.write_all(b" - ")?;
             file.write_all(text.as_bytes())?;
@@ -505,7 +505,7 @@ impl UniV {
             self.render.recording_duration = Duration::ZERO;
 
             if self.settings.save_timestamps {
-                let _ = self.render.timestamp_file.set(
+                self.render.timestamp_file = Some(
                     File::create("timestamps.txt")
                         .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?
                 );

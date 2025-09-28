@@ -29,6 +29,7 @@ use settings::{Profile, UniVSettings};
 use unil::ast::Expression;
 use utils::report_errors;
 use compiler::type_system::UniLType;
+use gui::SoundInfo;
 
 #[cfg(feature = "lite")]
 use bincode::decode_from_slice;
@@ -148,7 +149,7 @@ struct Render {
     pub frame_duration: f64,
 
     pub recording_duration: Duration,
-    pub timestamp_file: OnceCell<File>,
+    pub timestamp_file: Option<File>,
 
     pub speed_cnt:     u32,
     pub speed_cnt_max: u32,
@@ -193,8 +194,8 @@ pub struct UniV {
     pivot_selections: HashMap<Rc<str>, PivotSelection>,
     rotations:        HashMap<Rc<str>, Rotation>,
 
-    run_all_sorts:    OnceCell<AutomationFile>,
-    run_all_shuffles: OnceCell<AutomationFile>,
+    run_all_sorts:    Option<AutomationFile>,
+    run_all_shuffles: Option<AutomationFile>,
 
     vm: UniVM,
     automation_interpreter: AutomationInterpreter,
@@ -224,7 +225,7 @@ pub struct UniV {
     store_user_values: bool,
     /// Stores values given by the user to the GUI API for automation purposes if `store_user_values` is set to `true`
     user_values: Vec<UniLValue>,
-    shuffle_automation: OnceCell<AutomationFile>,
+    shuffle_automation: Option<AutomationFile>,
 
     /// Random generator source
     rng: ThreadRng,
@@ -232,7 +233,7 @@ pub struct UniV {
     rl_handle: OnceCell<RaylibHandle>,
     rl_thread: OnceCell<RaylibThread>,
     /// Texture used as framebuffer for render mode
-    render_texture: OnceCell<RenderTexture2D>,
+    render_texture: Option<RenderTexture2D>,
     audio: OnceCell<Audio>,
     mixer: SoundMixer,
     /// Represents the last timestamp in which a frame played a sound in real time mode.
@@ -297,8 +298,8 @@ impl UniV {
             pivot_selections: HashMap::new(),
             rotations: HashMap::new(),
 
-            run_all_sorts: OnceCell::new(),
-            run_all_shuffles: OnceCell::new(),
+            run_all_sorts: None,
+            run_all_shuffles: None,
 
             vm: UniVM::new(),
             language_layers,
@@ -325,13 +326,13 @@ impl UniV {
             autovalues: VecDeque::new(),
             store_user_values: false,
             user_values: Vec::new(),
-            shuffle_automation: OnceCell::new(),
+            shuffle_automation: None,
 
             rng: rand::rng(),
 
             rl_handle: OnceCell::new(),
             rl_thread: OnceCell::new(),
-            render_texture: OnceCell::new(),
+            render_texture: None,
             audio: OnceCell::new(),
             mixer: SoundMixer::new(),
             sound_timestamp: Instant::now(),
@@ -384,7 +385,7 @@ impl Render {
             active: false,
             frame_duration: 0.0,
             recording_duration: Duration::ZERO,
-            timestamp_file: OnceCell::new(),
+            timestamp_file: None,
             speed_cnt: 0,
             speed_cnt_max: 1,
             ffmpeg: OnceCell::new(),
@@ -877,7 +878,7 @@ impl UniV {
             let height = rl.get_screen_height() as f32;
 
             let mut draw = rl.begin_texture_mode(
-                get_expect!(self.rl_thread), get_expect_mut!(self.render_texture)
+                get_expect!(self.rl_thread), self.render_texture.as_mut().unwrap()
             );
 
             draw.clear_background(Color::BLACK);
@@ -886,7 +887,7 @@ impl UniV {
 
             drop(draw);
             let mut draw = rl.begin_drawing(get_expect!(self.rl_thread));
-            draw_flipped_texture!(draw, get_expect!(self.render_texture), width, height);
+            draw_flipped_texture!(draw, self.render_texture.as_ref().unwrap(), width, height);
         }
 
         if heatmap::should_tick(self.heatmap_cnt, self.settings.render_fps) {
@@ -896,7 +897,7 @@ impl UniV {
 
         let raw_texture = self.render_texture.take().unwrap().to_raw();
         let frame = unsafe { raylib::ffi::LoadImageFromTexture(raw_texture.texture) };
-        self.render_texture.set(unsafe { RenderTexture2D::from_raw(raw_texture) }).unwrap();
+        self.render_texture = Some(unsafe { RenderTexture2D::from_raw(raw_texture) });
 
         if self.render.ffmpeg.get().is_none() {
             self.init_ffmpeg(&frame)?;
@@ -1867,7 +1868,7 @@ impl UniV {
             let height = rl.get_screen_height() as f32;
 
             let mut draw = rl.begin_texture_mode(
-                get_expect!(self.rl_thread), get_expect_mut!(self.render_texture)
+                get_expect!(self.rl_thread), self.render_texture.as_mut().unwrap()
             );
 
             draw.clear_background(Color::BLACK);
@@ -1882,7 +1883,7 @@ impl UniV {
 
             drop(draw);
             let mut draw = rl.begin_drawing(get_expect!(self.rl_thread));
-            draw_flipped_texture!(draw, get_expect!(self.render_texture), width, height);
+            draw_flipped_texture!(draw, self.render_texture.as_ref().unwrap(), width, height);
         }
 
         if heatmap::should_tick(self.heatmap_cnt, self.settings.render_fps) {
@@ -1896,7 +1897,7 @@ impl UniV {
 
         let raw_texture = self.render_texture.take().unwrap().to_raw();
         let frame = unsafe { raylib::ffi::LoadImageFromTexture(raw_texture.texture) };
-        self.render_texture.set(unsafe { RenderTexture2D::from_raw(raw_texture) }).unwrap();
+        self.render_texture = Some(unsafe { RenderTexture2D::from_raw(raw_texture) });
 
         if self.render.ffmpeg.get().is_none() {
             self.init_ffmpeg(&frame)?;
@@ -2128,7 +2129,13 @@ impl UniV {
         self.gui.shuffles.sort();
         self.gui.categories = self.categories.iter().map(|x| Rc::clone(x)).collect();
         self.gui.visuals = self.visuals.iter().map(|x| Rc::from(x.name())).collect();
-        self.gui.sounds = self.sounds.iter().map(|x| Rc::from(x.name())).collect();
+
+        self.gui.sounds = self.sounds.iter().map(
+            |x| {
+                SoundInfo { name: Rc::from(x.name()), configurable: x.is_configurable() }
+            }
+        ).collect();
+
         self.gui.sorts = self.sorts.iter().map(
             |(category, sorts)| {
                 let mut sorts_vec: Vec<Rc<str>> = sorts.keys().map(|x| Rc::clone(&x)).collect();
@@ -2159,7 +2166,7 @@ impl UniV {
             name: Rc::from("Run automation"),
             callable: NativeCallable::new(
                 Rc::new(|univ, _args, _task| {
-                    if univ.shuffle_automation.get().is_none() {
+                    if univ.shuffle_automation.is_none() {
                         let automations = univ.list_automations()?;
 
                         if univ.check_no_automations(&automations)? {
@@ -2189,10 +2196,10 @@ impl UniV {
                             }
                         };
 
-                        univ.shuffle_automation.set(automation).unwrap();
+                        univ.shuffle_automation = Some(automation);
                     }
 
-                    let automation = get_expect!(univ.shuffle_automation);
+                    let automation = univ.shuffle_automation.as_ref().unwrap();
                     univ.execute_automation(
                         Rc::clone(&automation.source),
                         Rc::clone(&automation.filename)
@@ -2307,7 +2314,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    let _ = self.run_all_sorts.set(automation);
+                    self.run_all_sorts = Some(automation);
                 }
             }
         }
@@ -2316,7 +2323,7 @@ impl UniV {
             Err(e) => errors.push(e),
             Ok(automation) => {
                 if let Some(automation) = automation {
-                    let _ = self.run_all_shuffles.set(automation);
+                    self.run_all_shuffles = Some(automation);
                 }
             }
         }
@@ -2377,7 +2384,7 @@ impl UniV {
             let width = rl.get_screen_width() as u32;
             let height = rl.get_screen_height() as u32;
 
-            let _ = self.render_texture.set(
+            self.render_texture = Some(
                 rl.load_render_texture(get_expect!(self.rl_thread), width, height)
                     .expect("Could not load render texture")
             );
@@ -2652,10 +2659,10 @@ impl UniV {
 
         if self.render.active {
             let mut draw = rl.begin_texture_mode(
-                get_expect!(self.rl_thread), get_expect_mut!(self.gui.background)
+                get_expect!(self.rl_thread), self.gui.background.as_mut().unwrap()
             );
 
-            draw.draw_texture(get_expect!(self.render_texture), 0, 0, Color::WHITE);
+            draw.draw_texture(self.render_texture.as_ref().unwrap(), 0, 0, Color::WHITE);
         } else {
             let width  = rl.get_screen_width();
             let height = rl.get_screen_height();
@@ -2665,7 +2672,7 @@ impl UniV {
                 .expect("Could not load texture from screen image");
 
             let mut draw = rl.begin_texture_mode(
-                get_expect!(self.rl_thread), get_expect_mut!(self.gui.background)
+                get_expect!(self.rl_thread), self.gui.background.as_mut().unwrap()
             );
 
             draw_flipped_texture!(draw, &texture, width, height);
@@ -3211,7 +3218,7 @@ impl UniV {
                         continue;
                     }
 
-                    if self.run_all_sorts.get().is_none() {
+                    if self.run_all_sorts.is_none() {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
                             "Error",
@@ -3264,8 +3271,8 @@ impl UniV {
                         }
 
                         if let Err(e) = self.execute_automation(
-                            Rc::clone(&get_expect!(self.run_all_sorts).source),
-                            Rc::clone(&get_expect!(self.run_all_sorts).filename)
+                            Rc::clone(&self.run_all_sorts.as_ref().unwrap().source),
+                            Rc::clone(&self.run_all_sorts.as_ref().unwrap().filename)
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
@@ -3289,7 +3296,7 @@ impl UniV {
                         continue;
                     }
 
-                    if self.run_all_shuffles.get().is_none() {
+                    if self.run_all_shuffles.is_none() {
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set(
                             "Error",
@@ -3329,8 +3336,8 @@ impl UniV {
                         self.automation_interpreter.mode = AutomationMode::RunShuffles;
 
                         if let Err(e) = self.execute_automation(
-                            Rc::clone(&get_expect!(self.run_all_shuffles).source),
-                            Rc::clone(&get_expect!(self.run_all_shuffles).filename)
+                            Rc::clone(&self.run_all_shuffles.as_ref().unwrap().source),
+                            Rc::clone(&self.run_all_shuffles.as_ref().unwrap().filename)
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
@@ -3405,33 +3412,56 @@ impl UniV {
                         self.gui.settings.partial_reset();
                         self.run_gui()?;
 
-                        let new_res = self.settings.resolution != self.gui.settings.object.resolution;
-
-                        if self.gui.settings.config_deleted &&
-                            (self.gui.settings.back || !new_res) &&
-                            !(self.gui.settings.sound_setup || self.gui.settings.reload_algos)
-                        {
-                            // if a configuration is deleted, reinitialize visuals so that they can reload their configs
-                            // (and potentially start the configuration screen). if `new_res` is true and we're saving,
-                            // this is not needed because `set_window_size` will be called and do it on its own.
-                            // also, don't do this if the user pressed on the sound setup or reload algorithms button,
-                            // because that would be confusing
-                            self.init_visuals()?;
-                        }
-
                         if !self.gui.settings.back {
-                            if self.gui.settings.sound_setup {
-                                let sound = self.sounds.get_mut(self.gui.settings.curr_sound)
-                                    .expect("GUI returned invalid sound ID");
+                            if self.gui.settings.configure_sound {
+                                self.sounds.get_mut(self.gui.settings.curr_sound)
+                                    .expect("GUI returned invalid sound ID")
+                                    .config(
+                                        &self.shared,
+                                        &mut self.gui,
+                                        get_expect_mut!(self.rl_handle),
+                                        get_expect!(self.rl_thread)
+                                    )?;
 
-                                sound.prepare(
-                                    &self.shared,
-                                    &mut self.gui,
-                                    get_expect_mut!(self.rl_handle),
-                                    get_expect!(self.rl_thread)
-                                )?;
+                                continue;
+                            }
 
-                                self.gui.settings.load_configs();
+                            if self.gui.settings.configure_visual {
+                                let configurable_visuals: Vec<Rc<str>> = self.visuals.iter_mut()
+                                    .filter(|x| x.is_configurable())
+                                    .map(|x| Rc::from(x.name()))
+                                    .collect();
+
+                                if configurable_visuals.is_empty() {
+                                    self.gui.build_fn = Gui::popup;
+                                    self.gui.popup.set("Error", "No configurable visual style was found").unwrap();
+                                    self.run_gui()?;
+                                } else {
+                                    self.gui.build_fn = Gui::selection;
+                                    self.gui.selection.set_with_back(
+                                        "Configure visual style", 
+                                        "Select visual style to configure", 
+                                        configurable_visuals.clone(), 
+                                        0
+                                    ).unwrap();
+                                    self.run_gui()?;
+
+                                    if self.gui.selection.back {
+                                        continue;
+                                    }
+
+                                    let name = configurable_visuals.get(self.gui.selection.index)
+                                        .expect("GUI returned invalid visual ID");
+                                    let index = self.visuals.binary_search_by(|x| x.name().cmp(name))
+                                        .expect("Visuals vector is misaligned from GUI");
+                                    self.visuals[index].config(
+                                        &self.shared,
+                                        &mut self.gui,
+                                        get_expect_mut!(self.rl_handle),
+                                        get_expect!(self.rl_thread)
+                                    )?;
+                                }
+
                                 continue;
                             }
 
@@ -3445,8 +3475,9 @@ impl UniV {
                                     .expect("GUI returned invalid sound ID");
                             }
 
-                            let new_reverb  = self.settings.reverb  != self.gui.settings.object.reverb;
-                            let new_profile = self.settings.profile != self.gui.settings.object.profile;
+                            let new_res     = self.settings.resolution != self.gui.settings.object.resolution;
+                            let new_reverb  = self.settings.reverb     != self.gui.settings.object.reverb;
+                            let new_profile = self.settings.profile    != self.gui.settings.object.profile;
 
                             if self.settings != self.gui.settings.object {
                                 self.settings = self.gui.settings.object.clone();

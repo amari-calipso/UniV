@@ -1,9 +1,9 @@
-use std::{cell::OnceCell, collections::HashMap, fs::File, io::Error, rc::Rc};
+use std::{collections::HashMap, fs::{self, File}, io::Error, rc::Rc};
 
 use raylib::{color::Color, ffi::{PixelFormat, TraceLogLevel, Vector2}, math::Rectangle, texture::{Image, Texture2D}, RaylibHandle, RaylibThread};
 use serde::{Deserialize, Serialize};
 
-use crate::{get_expect, gui::{FileOption, Gui}, univm::object::ExecutionInterrupt, utils::{gfx::line_visual::LineVisual, translate}, visual, IdentityHashMap, DEFAULT_IMAGE, DEFAULT_IMAGE_FORMAT, LOG_LEVEL};
+use crate::{gui::{FileOption, Gui}, univm::object::ExecutionInterrupt, utils::{gfx::line_visual::LineVisual, translate}, visual, IdentityHashMap, DEFAULT_IMAGE, DEFAULT_IMAGE_FORMAT, LOG_LEVEL};
 
 macro_rules! custom_image_config_file {
     () => {
@@ -14,7 +14,7 @@ macro_rules! custom_image_config_file {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CustomImageSettings {
-    pub file: Option<String>,
+    pub file: String,
 }
 
 impl CustomImageSettings {
@@ -31,7 +31,7 @@ impl CustomImageSettings {
 
 pub struct CustomImage {
     line_visual: LineVisual,
-    image: OnceCell<Image>,
+    image: Option<Image>,
     chunks: IdentityHashMap<usize, Texture2D>,
     aux_chunks: Vec<Texture2D>,
     aux_map_factor: f64
@@ -46,7 +46,7 @@ impl CustomImage {
                 let width  = rl.get_screen_width();
                 let height = rl.get_screen_height();
                 image.resize(width, height);
-                let _ = self.image.set(image);
+                self.image = Some(image);
             }
             Err(e) => {
                 gui.build_fn = Gui::popup;
@@ -69,7 +69,20 @@ impl CustomImage {
         let height = rl.get_screen_height();
         image.resize(width, height);
         image.set_format(PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-        let _ = self.image.set(image);
+        self.image = Some(image);
+    }
+
+    fn delete_config(&mut self, gui: &mut Gui, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+        if let Err(e) = fs::remove_file(custom_image_config_file!()) {
+            gui.build_fn = Gui::popup;
+            gui.popup.set(
+                "Error", 
+                format!("An error occurred while trying to delete the custom image configuration: {}", e.to_string()).as_str()
+            ).unwrap();
+            gui.run(rl, thread)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -80,7 +93,7 @@ visual! {
     CustomImage::new(self) {
         CustomImage { 
             line_visual: LineVisual::new(),
-            image: OnceCell::new(),
+            image: None,
             chunks: HashMap::default(),
             aux_chunks: Vec::new(),
             aux_map_factor: 0.0
@@ -88,104 +101,25 @@ visual! {
     }
 
     init(_shared, gui, rl, thread) {
-        loop {
-            if custom_image_config_file!().exists() {
-                let config = {
-                    match CustomImageSettings::load() {
-                        Ok(conf) => conf,
-                        Err(e) => {
-                            gui.build_fn = Gui::popup;
-                            gui.popup.set(
-                                "Custom Image visual style",
-                                format!("Unable to load custom image configuration:\n{}", e).as_str()
-                            ).unwrap();
-                            gui.run(rl, thread)?;
-                            return Ok(());
-                        }
+        if custom_image_config_file!().exists() {
+            let config = {
+                match CustomImageSettings::load() {
+                    Ok(conf) => conf,
+                    Err(e) => {
+                        gui.build_fn = Gui::popup;
+                        gui.popup.set(
+                            "Custom Image visual style",
+                            format!("Unable to load custom image configuration:\n{}", e).as_str()
+                        ).unwrap();
+                        gui.run(rl, thread)?;
+                        return Ok(());
                     }
-                };
-
-                if config.file.is_none() {
-                    self.load_default_image(rl);
-                    return Ok(());
                 }
+            };
 
-                self.load_image(&config.file.unwrap(), gui, rl, thread)?;
-                return Ok(());
-            }
-
-            gui.build_fn = Gui::selection;
-            gui.selection.set(
-                "Custom Image visual style",
-                concat!(
-                    "Do you want to set an image for the Custom Image visual style?\n",
-                    "If you say no, this will not be asked again,\n",
-                    "but you can change this setting later by resetting the 'CustomImage'\n",
-                    "configuration through UniV's settings."
-                ),
-                [
-                    "Yes", "No"
-                ].into_iter().map(|x| Rc::from(x)).collect(),
-                0
-            ).unwrap();
-            gui.run(rl, thread)?;
-
-            let config;
-            if gui.selection.index == 0 {
-                loop {
-                    gui.build_fn = Gui::file_dialog;
-                    gui.file_dialog.set("Custom Image visual style", false).unwrap();
-                    gui.run(rl, thread)?;
-
-                    match gui.file_dialog.selected.clone() {
-                        FileOption::Some(path) => {
-                            let path = path.to_str().unwrap();
-                            self.load_image(path, gui, rl, thread)?;
-                            config = CustomImageSettings {
-                                file: Some(String::from(path))
-                            };
-                        }
-                        FileOption::Canceled => {
-                            gui.build_fn = Gui::popup;
-                            gui.popup.set(
-                                "Custom Image visual style",
-                                "Canceled. Using default image"
-                            ).unwrap();
-                            gui.run(rl, thread)?;
-
-                            self.load_default_image(rl);
-                            config = CustomImageSettings {
-                                file: None
-                            };
-                        }
-                        FileOption::None => {
-                            gui.build_fn = Gui::popup;
-                            gui.popup.set(
-                                "Custom Image visual style",
-                                "No image file selected"
-                            ).unwrap();
-                            gui.run(rl, thread)?;
-                            continue;
-                        }
-                    }
-
-                    break;
-                }
-            } else {
-                config = CustomImageSettings {
-                    file: None
-                };
-            }
-
-            if let Err(e) = config.save() {
-                gui.build_fn = Gui::popup;
-                gui.popup.set(
-                    "Custom Image visual style",
-                    format!("Unable to save configuration:\n{}", e).as_str()
-                ).unwrap();
-                gui.run(rl, thread)?;
-                return Ok(());
-            }
+            self.load_image(&config.file, gui, rl, thread)?;
+        } else {
+            self.load_default_image(rl);
         }
     }
 
@@ -195,6 +129,88 @@ visual! {
         self.chunks.clear();
         self.aux_chunks.clear();
         rl.set_trace_log(LOG_LEVEL);
+    }
+
+    config(_shared, gui, rl, thread) {
+        let config_exists = custom_image_config_file!().exists();
+        let action = {
+            if config_exists {
+                gui.build_fn = Gui::selection;
+                gui.selection.set(
+                    "Custom Image visual style",
+                    "An image is configured for the visual style.\nWhat would you like to do?",
+                    [
+                        "Change image", 
+                        "Use default image"
+                    ].into_iter().map(|x| Rc::from(x)).collect(),
+                    0
+                ).unwrap();
+                gui.run(rl, thread)?;
+                gui.selection.index
+            } else {
+                gui.build_fn = Gui::popup;
+                gui.popup.set("Custom Image visual style", "Please select an image to use for the visual style").unwrap();
+                gui.run(rl, thread)?;
+                0
+            }
+        };
+
+        if action == 1 {
+            self.load_default_image(rl);
+            self.delete_config(gui, rl, thread)?;
+            return Ok(());
+        }
+
+        loop {
+            gui.build_fn = Gui::file_dialog;
+            gui.file_dialog.set("Custom Image visual style", false).unwrap();
+            gui.run(rl, thread)?;
+
+            match gui.file_dialog.selected.clone() {
+                FileOption::Some(path) => {
+                    let path = path.to_str().unwrap();
+                    self.load_image(path, gui, rl, thread)?;
+                    let config = CustomImageSettings {
+                        file: String::from(path)
+                    };
+
+                    if let Err(e) = config.save() {
+                        gui.build_fn = Gui::popup;
+                        gui.popup.set(
+                            "Custom Image visual style",
+                            format!("Unable to save configuration:\n{}", e).as_str()
+                        ).unwrap();
+                        gui.run(rl, thread)?;
+                        return Ok(());
+                    }
+                }
+                FileOption::Canceled => {
+                    gui.build_fn = Gui::popup;
+                    gui.popup.set(
+                        "Custom Image visual style",
+                        "Canceled. Using default image"
+                    ).unwrap();
+                    gui.run(rl, thread)?;
+
+                    self.load_default_image(rl);
+
+                    if config_exists {
+                        self.delete_config(gui, rl, thread)?;
+                    }
+                }
+                FileOption::None => {
+                    gui.build_fn = Gui::popup;
+                    gui.popup.set(
+                        "Custom Image visual style",
+                        "No image file selected"
+                    ).unwrap();
+                    gui.run(rl, thread)?;
+                    continue;
+                }
+            }
+
+            break;
+        }
     }
 
     prepare(shared, rl, thread) {
@@ -213,7 +229,7 @@ visual! {
                 0.0, self.line_visual.resolution_x as f64 - self.line_visual.rounded_line_width as f64
             ) as f32;
 
-            let mut chunk = get_expect!(self.image).clone();
+            let mut chunk = self.image.as_ref().unwrap().clone();
             chunk.crop(Rectangle {
                 x, y: 0.0, 
                 width: self.line_visual.rounded_line_width as f32,
@@ -241,7 +257,7 @@ visual! {
 
         let mut x = 0f32;
         while x < self.line_visual.resolution_x as f32 {
-            let mut chunk = get_expect!(self.image).clone();
+            let mut chunk = self.image.as_ref().unwrap().clone();
             chunk.crop(Rectangle {
                 x, y, 
                 width: line_width_f32,
@@ -257,7 +273,7 @@ visual! {
         }
 
         if self.aux_chunks.is_empty() {
-            let mut chunk = get_expect!(self.image).clone();
+            let mut chunk = self.image.as_ref().unwrap().clone();
             chunk.crop(Rectangle {
                 x: 0.0, y, 
                 width: chunk.width as f32,

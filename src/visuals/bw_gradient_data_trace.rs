@@ -1,6 +1,6 @@
 use raylib::{color::Color, ffi::Vector2, prelude::{RaylibDraw, RaylibTextureModeExt}};
 
-use crate::{get_expect, get_expect_mut, utils::gfx::{base_data_trace::BaseDataTrace, line_visual::LineVisual}, visual};
+use crate::{utils::gfx::{base_data_trace::BaseDataTrace, line_visual::LineVisual}, visual};
 
 pub struct BwGradientDataTrace {
     base: BaseDataTrace,
@@ -44,7 +44,7 @@ visual! {
         }
 
         if self.base.update_main(&shared, rl, thread) {
-            let mut draw = rl.begin_texture_mode(thread, get_expect_mut!(self.base.main_texture));
+            let mut draw = rl.begin_texture_mode(thread, self.base.main_texture.as_mut().unwrap());
 
             let mut x = 0usize;
             for i in 0 .. shared.array.len() {
@@ -62,7 +62,7 @@ visual! {
         }
 
         if self.base.update_aux(&shared, rl, thread) {
-            let mut draw = rl.begin_texture_mode(thread, get_expect_mut!(self.base.aux_texture));
+            let mut draw = rl.begin_texture_mode(thread, self.base.aux_texture.as_mut().unwrap());
 
             let mut x = 0usize;
             for i in 0 .. shared.aux.len() {
@@ -81,7 +81,7 @@ visual! {
     }
 
     draw(shared, draw, indices) {
-        draw.draw_texture(get_expect!(self.base.main_texture), 0, 0, Color::WHITE);
+        draw.draw_texture(self.base.main_texture.as_ref().unwrap(), 0, 0, Color::WHITE);
 
         let mut last_i = 0usize;
         let mut x = 0usize;
@@ -108,7 +108,7 @@ visual! {
     }
 
     draw_aux(shared, draw, indices) {
-        draw.draw_texture(get_expect!(self.base.aux_texture), 0, 0, Color::WHITE);
+        draw.draw_texture(self.base.aux_texture.as_ref().unwrap(), 0, 0, Color::WHITE);
 
         let mut last_i = 0usize;
         let mut x = 0usize;

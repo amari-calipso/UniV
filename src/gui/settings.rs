@@ -1,24 +1,21 @@
 use std::{fs, rc::Rc};
 
+use imgui::ItemHoveredFlags;
 use raylib::ffi::TraceLogLevel;
 
-use crate::{config_dir, imgui_centered_text, imgui_spaced_separator, log, profiles_dir, settings::UniVSettings};
+use crate::{gui::SoundInfo, imgui_centered_text, imgui_spaced_separator, log, profiles_dir, settings::UniVSettings};
 
 use super::Gui;
 
 pub struct Settings {
     pub object: UniVSettings,
-    pub sound_setup: bool,
-    pub reset_pressed: bool,
-    pub config_deleted: bool,
+    pub configure_sound: bool,
+    pub configure_visual: bool,
     pub reload_algos: bool,
     pub back: bool,
 
     pub profiles: Vec<Rc<str>>,
-    pub configs:  Vec<Rc<str>>,
-
     pub curr_profile: usize,
-    pub curr_config: usize,
     pub curr_sound: usize,
 }
 
@@ -26,24 +23,20 @@ impl Settings {
     pub fn new() -> Self {
         Settings { 
             object: UniVSettings::new(), 
-            sound_setup: false,
-            reset_pressed: false,
-            config_deleted: false,
+            configure_sound: false,
+            configure_visual: false,
             reload_algos: false,
             back: false,
 
-            profiles: Vec::new(), 
-            configs: Vec::new(),
-
+            profiles: Vec::new(),
             curr_profile: 0,
-            curr_config: 0,
             curr_sound: 0
         }
     }
 
     pub fn partial_reset(&mut self) {
-        self.sound_setup = false;
-        self.reset_pressed = false;
+        self.configure_sound = false;
+        self.configure_visual = false;
         self.reload_algos = false;
     }
 
@@ -92,56 +85,14 @@ impl Settings {
         self.curr_profile = 0;
     }
 
-    pub fn load_configs(&mut self) {
-        let err = 'err: {
-            match fs::read_dir(config_dir!()) {
-                Ok(files) => {
-                    self.configs = Vec::new();
-                    for file in files {
-                        match file {
-                            Ok(f) => {
-                                let filename = f.file_name();
-                                let name = filename.to_str().unwrap();
-                                if name.ends_with(".json") {
-                                    self.configs.push(name.strip_suffix(".json").unwrap().into());
-                                }
-                            }
-                            Err(e) => {
-                                break 'err e.to_string();
-                            }
-                        }
-                    }
-                    
-                    self.curr_config = 0;
-                    if self.configs.is_empty() {
-                        self.configs.push(Rc::from("<no configs>"));
-                    } else {
-                        self.configs.sort();
-                    }
-
-                    return;
-                }
-                Err(e) => e.to_string(),
-            }
-        };
-        
-        log!(TraceLogLevel::LOG_ERROR, "Error listing configurations");
-        log!(TraceLogLevel::LOG_ERROR, "    > {}", err.to_string());
-        self.configs = vec![Rc::from("<no configs>")];
-        self.curr_config = 0;
-    }
-
-
-    pub fn load(&mut self, settings: &UniVSettings, sounds: &[Rc<str>]) {
+    pub fn load(&mut self, settings: &UniVSettings, sounds: &[SoundInfo]) {
         self.object = settings.clone();
 
-        self.sound_setup = false;
-        self.reset_pressed = false;
+        self.partial_reset();
         self.back = false;
-        self.curr_sound = sounds.binary_search(&Rc::from(self.object.sound.as_str())).unwrap();
+        self.curr_sound = sounds.binary_search_by(|x| x.name.as_ref().cmp(self.object.sound.as_str())).unwrap();
 
         self.load_profiles();
-        self.load_configs();
     }
 }
 
@@ -157,14 +108,14 @@ impl Gui {
                     self.resolution_x / 2.0 - self.settings_window_size_x / 2.0, 
                     self.resolution_y / 2.0 - self.settings_window_size_y / 2.0
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .size(
                 [
                     self.settings_window_size_x, 
                     self.settings_window_size_y
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .bg_alpha(Gui::ALPHA)
             .build(|| {
@@ -201,6 +152,13 @@ impl Gui {
                 ui.input_scalar_n("Resolution (x, y)", &mut self.settings.object.resolution).build();
 
                 ui.spacing();
+                
+                if ui.button("Configure visual") {
+                    self.settings.configure_visual = true;
+                    quit = true;
+                }
+
+                ui.spacing();
                 imgui_centered_text!(ui, "Sound");
                 imgui_spaced_separator!(ui);
 
@@ -213,21 +171,27 @@ impl Gui {
                 }
 
                 ui.spacing();
-
-                if ui.button("Setup") {
-                    self.settings.sound_setup = true;
-                    quit = true;
-                }
-
-                if ui.is_item_hovered() {
+                
+                let sound_not_configurable = !self.sounds[self.settings.curr_sound].configurable;
+                ui.disabled(sound_not_configurable, || {
+                    if ui.button("Configure") {
+                        self.settings.configure_sound = true;
+                        quit = true;
+                    }
+                });
+                if sound_not_configurable && ui.is_item_hovered_with_flags(ItemHoveredFlags::ALLOW_WHEN_DISABLED) {
                     ui.tooltip(|| {
-                        ui.text("Runs the preparation script for the selected sound engine");
+                        ui.text("This sound engine is not configurable");
                     });
                 }
                 
                 ui.same_line();
 
-                ui.combo_simple_string("Sound", &mut self.settings.curr_sound, &self.sounds);
+                ui.combo_simple_string(
+                    "Sound", 
+                    &mut self.settings.curr_sound, 
+                    &self.sounds.iter().map(|x| x.name.as_ref()).collect::<Vec<&str>>()
+                );
 
                 ui.spacing();
                 imgui_centered_text!(ui, "Render mode");
@@ -239,19 +203,19 @@ impl Gui {
                         ui.text("Enables render mode");
                     });
                 }
-            
+
                 ui.disabled(!self.settings.object.render, || {
                     ui.checkbox("Save timestamps", &mut self.settings.object.save_timestamps);
-                    if ui.is_item_hovered() {
-                        ui.tooltip(|| {
-                            ui.text(concat!(
-                                "Stores a list of timestamps in YouTube-compatible format as defined in the running automation.\n",
-                                "The output is saved in 'timestamps.txt'.\n",
-                                "Note that this only works in render mode"
-                            ));
-                        });
-                    }
                 });
+                if ui.is_item_hovered_with_flags(ItemHoveredFlags::ALLOW_WHEN_DISABLED) {
+                    ui.tooltip(|| {
+                        ui.text(concat!(
+                            "Stores a list of timestamps in YouTube-compatible format as defined in the running automation.\n",
+                            "The output is saved in 'timestamps.txt'.\n",
+                            "Note that this only works in render mode"
+                        ));
+                    });
+                }
 
                 ui.input_scalar("FPS", &mut self.settings.object.render_fps).build();
                 if ui.is_item_hovered() {
@@ -271,44 +235,6 @@ impl Gui {
                     if ui.button("Reload algorithms") {
                         self.settings.reload_algos = true;
                         quit = true;
-                    }
-                }
-
-                ui.spacing();
-
-                let config_name = Rc::clone(&self.settings.configs[self.settings.curr_config]);
-
-                if self.settings.reset_pressed && config_name.as_ref() != "<no configs>" {
-                    if ui.button("Cancel deletion") {
-                        self.settings.reset_pressed = false;
-                    }
-                } else {
-                    if ui.button("Reset configuration") {
-                        self.settings.reset_pressed = true;
-                    }
-
-                    if ui.is_item_hovered() {
-                        ui.tooltip(|| {
-                            ui.text("Delete settings for the selected module");
-                        });
-                    }
-                }
-
-                ui.same_line();
-                ui.combo_simple_string("##config", &mut self.settings.curr_config, &self.settings.configs);
-
-                if self.settings.reset_pressed && 
-                    config_name.as_ref() != "<no configs>" && 
-                    ui.button(format!("Confirm deletion for '{config_name}'").as_str()) 
-                {
-                    self.settings.reset_pressed = false;
-                    
-                    if let Err(e) = fs::remove_file(config_dir!().join(format!("{config_name}.json"))) {
-                        log!(TraceLogLevel::LOG_ERROR, "Error deleting configuration");
-                        log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
-                    } else {
-                        self.settings.config_deleted = true;
-                        self.settings.load_configs();
                     }
                 }
 
@@ -336,7 +262,7 @@ impl Gui {
                 self.settings.object.profile = profile;
             }
             
-            self.settings.object.sound = self.sounds[self.settings.curr_sound].to_string();
+            self.settings.object.sound = self.sounds[self.settings.curr_sound].name.to_string();
         }
 
         quit

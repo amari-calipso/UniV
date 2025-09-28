@@ -1,4 +1,4 @@
-use std::{cell::{OnceCell, RefCell}, collections::{HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
@@ -7,7 +7,7 @@ use object::{AnonObject, AnyCallable, AnyObject, Callable, ExecutionInterrupt, F
 use raylib::ffi::TraceLogLevel;
 use serde::Serializer;
 
-use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, get_expect, highlights::HighlightInfo, log, utils::{lang::traceback_part, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
+use crate::{algos::{Distribution, PivotSelection, Rotation, Shuffle, Sort}, api_layers, highlights::HighlightInfo, log, utils::{lang::traceback_part, object::{expect_int_range_strict, expect_int_strict}}, with_timer, IdentityHashMap, IdentityHashSet, UniV};
 
 pub mod object;
 pub mod environment;
@@ -466,7 +466,7 @@ thread_local! {
 
 pub struct UniVM {
     pub globals:  Rc<RefCell<Environment>>,
-    pub bytecode: OnceCell<Bytecode>,
+    pub bytecode: Option<Bytecode>,
 
     pub delegate_call: bool,
     
@@ -478,7 +478,7 @@ pub struct UniVM {
 
 macro_rules! load_name {
     ($slf: expr, $idx: expr) => {
-        get_expect!($slf.bytecode).names.get($idx as usize)
+        $slf.bytecode.as_ref().unwrap().names.get($idx as usize)
             .expect("VM tried to access out of bounds names index")
     };
 }
@@ -497,7 +497,7 @@ impl UniVM {
     pub fn new() -> Self {
         Self {
             globals: Rc::new(RefCell::new(Self::load_globals())),
-            bytecode: OnceCell::new(),
+            bytecode: None,
             delegate_call: false,
             return_values: HashMap::default(),
             scheduled_tasks: HashMap::default(),
@@ -531,7 +531,7 @@ impl UniVM {
     }
 
     pub fn set_bytecode(&mut self, bytecode: Bytecode) {
-        let _ = self.bytecode.set(bytecode);
+        self.bytecode = Some(bytecode);
     }
 
     pub fn create_exception(&mut self, value: UniLValue) -> ExecutionInterrupt {
@@ -565,10 +565,10 @@ impl UniV {
                     }
 
                     for _ in 0 .. UniVM::TIME_SLICE_INSTRUCTIONS {
-                        let instruction = get_expect!(self.vm.bytecode).instructions.get(task.ip as usize)
+                        let instruction = self.vm.bytecode.as_ref().unwrap().instructions.get(task.ip as usize)
                             .expect("VM instruction pointer tried to access out of bounds instructions").clone();
     
-                        let position = get_expect!(self.vm.bytecode).positions.get(task.ip as usize)
+                        let position = self.vm.bytecode.as_ref().unwrap().positions.get(task.ip as usize)
                             .expect("VM instruction pointer tried to access out of bounds position").clone();
 
                         task.pos_stack.push(position);
@@ -631,7 +631,7 @@ impl UniV {
                                 task.pop_exception_stack();
                             }
                             Instruction::LoadConst(idx) => {
-                                let value = get_expect!(self.vm.bytecode).constants.get(idx as usize)
+                                let value = self.vm.bytecode.as_ref().unwrap().constants.get(idx as usize)
                                     .expect("VM tried to load out of bounds constant").clone();
                                 task.stack.push(value);
                             }

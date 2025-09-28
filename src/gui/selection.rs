@@ -6,7 +6,10 @@ pub struct Selection {
     pub title:   String,
     pub message: String,
     pub items: Vec<Rc<str>>,
-    pub index: usize
+    pub index: usize,
+
+    pub enable_back: bool,
+    pub back: bool,
 }
 
 impl Selection {
@@ -15,11 +18,13 @@ impl Selection {
             title: String::from("Selection screen"),
             message: String::from("No message provided"),
             items: Vec::new(),
-            index: 0
+            index: 0,
+            enable_back: false,
+            back: false,
         }
     }
 
-    pub fn set(&mut self, title: &str, message: &str, items: Vec<Rc<str>>, index: usize) -> Result<(), Rc<str>> {
+    fn set_internal(&mut self, title: &str, message: &str, items: Vec<Rc<str>>, index: usize) -> Result<(), Rc<str>> {
         if index >= items.len() {
             return Err(format!("Invalid default index {} for length {}", index, items.len()).into());
         }
@@ -41,6 +46,17 @@ impl Selection {
 
         Ok(())
     }
+
+    pub fn set(&mut self, title: &str, message: &str, items: Vec<Rc<str>>, index: usize) -> Result<(), Rc<str>> {
+        self.enable_back = false;
+        self.set_internal(title, message, items, index)
+    }
+
+    pub fn set_with_back(&mut self, title: &str, message: &str, items: Vec<Rc<str>>, index: usize) -> Result<(), Rc<str>> {
+        self.enable_back = true;
+        self.back = false;
+        self.set_internal(title, message, items, index)
+    }
 }
 
 impl Gui {
@@ -55,14 +71,14 @@ impl Gui {
                     self.resolution_x / 2.0 - self.medium_window_size_x / 2.0, 
                     self.resolution_y / 2.0 - self.medium_window_size_y / 2.0
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .size(
                 [
                     self.medium_window_size_x, 
                     self.medium_window_size_y
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .bg_alpha(Gui::ALPHA)
             .build(|| {
@@ -81,9 +97,28 @@ impl Gui {
                     });
 
                 ui.spacing();
-                ui.set_cursor_pos([ui.window_content_region_max()[0] / 2.0 - Gui::OK_BUTTON_X_SIZE / 2.0, ui.cursor_pos()[1]]);
-                if ui.button_with_size("OK", [Gui::OK_BUTTON_X_SIZE, Gui::OK_BUTTON_Y_SIZE]) {
-                    quit = true;
+
+                if self.selection.enable_back {
+                    ui.set_cursor_pos([ui.cursor_pos()[0], ui.window_content_region_max()[1] - Gui::BACK_BUTTON_Y_SIZE]);
+                    if ui.button("Back") {
+                        self.selection.back = true;
+                        quit = true;
+                    }
+
+                    ui.same_line();
+                    ui.set_cursor_pos([
+                        ui.window_content_region_max()[0] - Gui::OK_BUTTON_X_SIZE, 
+                        ui.window_content_region_max()[1] - Gui::OK_BUTTON_Y_SIZE
+                    ]);
+                    
+                    if ui.button_with_size("OK", [Gui::OK_BUTTON_X_SIZE, Gui::OK_BUTTON_Y_SIZE]) {
+                        quit = true;
+                    }
+                } else {
+                    ui.set_cursor_pos([ui.window_content_region_max()[0] / 2.0 - Gui::OK_BUTTON_X_SIZE / 2.0, ui.cursor_pos()[1]]);
+                    if ui.button_with_size("OK", [Gui::OK_BUTTON_X_SIZE, Gui::OK_BUTTON_Y_SIZE]) {
+                        quit = true;
+                    }
                 }
             });
 

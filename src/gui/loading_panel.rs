@@ -33,14 +33,14 @@ impl Gui {
                     self.resolution_x / 2.0 - self.small_window_size_x / 2.0, 
                     self.resolution_y / 2.0 - self.small_window_size_y / 2.0
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .size(
                 [
                     self.small_window_size_x, 
                     self.small_window_size_y
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .no_decoration()
             .bg_alpha(Gui::ALPHA)

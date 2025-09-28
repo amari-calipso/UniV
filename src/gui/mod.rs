@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 use automation_selection::AutomationSelection;
 use file_dialog::FileDialog;
@@ -13,7 +13,7 @@ use selection::Selection;
 use settings::Settings;
 use text_input::TextInput;
 
-use crate::{get_expect, get_expect_mut, univm::object::ExecutionInterrupt, LOG_LEVEL, REFERENCE_FRAMERATE};
+use crate::{univm::object::ExecutionInterrupt, LOG_LEVEL, REFERENCE_FRAMERATE};
 
 mod run_sort;
 mod selection;
@@ -45,13 +45,18 @@ impl AutomationFileInfo {
     }
 }
 
+pub struct SoundInfo {
+    pub name: Rc<str>,
+    pub configurable: bool
+}
+
 pub struct Gui {
     imgui: imgui::Context,
-    renderer: OnceCell<raylib_imgui_rs::Renderer>,
+    renderer: Option<raylib_imgui_rs::Renderer>,
     pub build_fn: fn(&mut Self) -> bool,
 
     pub target_fps: u32,
-    pub background: OnceCell<RenderTexture2D>,
+    pub background: Option<RenderTexture2D>,
 
     resolution_x: f32,
     resolution_y: f32,
@@ -71,7 +76,7 @@ pub struct Gui {
     pub sorts:            HashMap<Rc<str>, Vec<Rc<str>>>,
     pub categories:       Vec<Rc<str>>,
     pub visuals:          Vec<Rc<str>>,
-    pub sounds:           Vec<Rc<str>>,
+    pub sounds:           Vec<SoundInfo>,
     pub rotations:        Vec<Rc<str>>,
     pub pivot_selections: Vec<Rc<str>>,
     
@@ -120,11 +125,11 @@ impl Gui {
 
         Gui {
             imgui,
-            renderer: OnceCell::new(),
+            renderer: None,
             build_fn: Self::placeholder_fn,
 
             target_fps: REFERENCE_FRAMERATE,
-            background: OnceCell::new(),
+            background: None,
 
             resolution_x: 0.0,
             resolution_y: 0.0,
@@ -168,9 +173,7 @@ impl Gui {
                 FontSource::DefaultFontData { config: None }
             ]);
 
-        let _ = self.renderer.set(
-            raylib_imgui_rs::Renderer::create(&mut self.imgui, rl, thread)
-        );
+        self.renderer = Some(raylib_imgui_rs::Renderer::create(&mut self.imgui, rl, thread));
 
         let width = rl.get_screen_width() as u32;
         let height = rl.get_screen_height() as u32;
@@ -179,7 +182,7 @@ impl Gui {
             .expect("Could not load render texture");
         rl.begin_texture_mode(thread, &mut background).clear_background(Color::BLACK);
         
-        let _ = self.background.set(background);
+        self.background = Some(background);
 
         self.resolution_x = width as f32;
         self.resolution_y = height as f32;
@@ -207,13 +210,13 @@ impl Gui {
         let mut quit = true;
 
         while !rl.window_should_close() {
-            get_expect_mut!(self.renderer).update(&mut self.imgui, rl);
+            self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
 
             let done = (self.build_fn)(self);
 
             let mut draw = rl.begin_drawing(thread);
-            draw.draw_texture(get_expect!(self.background), 0, 0, Color::WHITE);
-            get_expect!(self.renderer).render(&mut self.imgui, &mut draw);
+            draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
+            self.renderer.as_ref().unwrap().render(&mut self.imgui, &mut draw);
 
             if done {
                 quit = false;
@@ -224,7 +227,7 @@ impl Gui {
         // restores old background, so that if another window is drawn, the old one doesn't get shown
         {
             let mut draw = rl.begin_drawing(thread);
-            draw.draw_texture(get_expect!(self.background), 0, 0, Color::WHITE);
+            draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
         }
 
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
@@ -243,11 +246,11 @@ impl Gui {
             return Err(ExecutionInterrupt::Quit);
         }
 
-        get_expect_mut!(self.renderer).update(&mut self.imgui, rl);
+        self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
         (self.build_fn)(self);
         let mut draw = rl.begin_drawing(thread);
-        draw.draw_texture(get_expect!(self.background), 0, 0, Color::WHITE);
-        get_expect!(self.renderer).render(&mut self.imgui, &mut draw);
+        draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
+        self.renderer.as_ref().unwrap().render(&mut self.imgui, &mut draw);
         Ok(())
     }
 }

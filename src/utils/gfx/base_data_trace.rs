@@ -1,8 +1,6 @@
-use std::cell::OnceCell;
-
 use raylib::{color::Color, math::{Rectangle, Vector2}, prelude::{RaylibDraw, RaylibTextureModeExt}, texture::{RaylibTexture2D, RenderTexture2D}, RaylibHandle, RaylibThread};
 
-use crate::{get_expect_mut, value::Value, Shared, REFERENCE_FRAMERATE};
+use crate::{value::Value, Shared, REFERENCE_FRAMERATE};
 
 use super::line_visual::LineVisual;
 
@@ -10,12 +8,12 @@ pub struct BaseDataTrace {
     pub base: LineVisual,
 
     pub old_array:    Vec<Value>,
-    pub main_texture: OnceCell<RenderTexture2D>,
-    swap_texture:     OnceCell<RenderTexture2D>,
+    pub main_texture: Option<RenderTexture2D>,
+    swap_texture:     Option<RenderTexture2D>,
 
     pub old_aux:      Vec<Value>,
-    pub aux_texture:  OnceCell<RenderTexture2D>,
-    aux_swap_texture: OnceCell<RenderTexture2D>,
+    pub aux_texture:  Option<RenderTexture2D>,
+    aux_swap_texture: Option<RenderTexture2D>,
 
     frame_counter: u64,
 }
@@ -27,11 +25,11 @@ impl BaseDataTrace {
         BaseDataTrace { 
             base: LineVisual::new(), 
             old_array: Vec::new(), 
-            main_texture: OnceCell::new(), 
-            swap_texture: OnceCell::new(), 
+            main_texture: None, 
+            swap_texture: None, 
             old_aux: Vec::new(), 
-            aux_texture: OnceCell::new(),
-            aux_swap_texture: OnceCell::new(), 
+            aux_texture: None,
+            aux_swap_texture: None, 
             frame_counter: 0
         }
     }
@@ -40,22 +38,22 @@ impl BaseDataTrace {
         let width  = rl.get_screen_width() as u32;
         let height = rl.get_screen_height() as u32;
         
-        let _ = self.main_texture.set(
+        self.main_texture = Some(
             rl.load_render_texture(thread, width, height)
                 .expect("Could not load render texture")
         );
 
-        let _ = self.swap_texture.set(
+        self.swap_texture = Some(
             rl.load_render_texture(thread, width, height)
                 .expect("Could not load render texture")
         );
 
-        let _ = self.aux_texture.set(
+        self.aux_texture = Some(
             rl.load_render_texture(thread, width, height / 4)
                 .expect("Could not load render texture")
         );
 
-        let _ = self.aux_swap_texture.set(
+        self.aux_swap_texture = Some(
             rl.load_render_texture(thread, width, height / 4)
                 .expect("Could not load render texture")
         );
@@ -151,14 +149,14 @@ impl BaseDataTrace {
 
     pub fn update_main(&mut self, shared: &Shared, rl: &mut RaylibHandle, thread: &RaylibThread) -> bool {
         Self::update(
-            get_expect_mut!(self.main_texture), get_expect_mut!(self.swap_texture),
+            self.main_texture.as_mut().unwrap(), self.swap_texture.as_mut().unwrap(),
             &mut self.old_array, &shared.array, rl, thread
         )
     } 
 
     pub fn update_aux(&mut self, shared: &Shared, rl: &mut RaylibHandle, thread: &RaylibThread) -> bool {
         Self::update(
-            get_expect_mut!(self.aux_texture), get_expect_mut!(self.aux_swap_texture),
+            self.aux_texture.as_mut().unwrap(), self.aux_swap_texture.as_mut().unwrap(),
             &mut self.old_aux, &shared.aux, rl, thread
         )
     } 

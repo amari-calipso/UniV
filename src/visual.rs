@@ -8,6 +8,20 @@ pub trait Visual {
     fn name(&self) -> &str;
     /// The default highlight color
     fn highlight_color(&self) -> Color;
+    /// Draws the main array
+    fn draw(&mut self, shared: &mut Shared, draw: &mut impl RaylibDraw, indices: &IdentityHashMap<usize, Color>);
+    /// Draws the auxiliary arrays
+    fn draw_aux(&mut self, shared: &mut Shared, draw: &mut impl RaylibDraw, indices: &IdentityHashMap<usize, Color>);
+
+    /// Optional: Is called when the program requests the visual to show a configuration screen
+    fn config(&mut self, _shared: &Shared, _gui: &mut Gui, _raylib: &mut RaylibHandle, _thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+        Ok(())
+    }
+
+    /// Optional: MUST be set to true if the visual implements config
+    fn is_configurable(&self) -> bool {
+        false
+    }
 
     /// Optional: Is called when the program is initialized or the screen resolution is changed.
     /// Useful for preliminary setup, such as preparing resolution-bound data, or allocating textures
@@ -28,11 +42,6 @@ pub trait Visual {
     /// Optional: Is called before starting the draw process.
     /// Useful for setup that must happen before the draw handle is created
     fn pre_draw(&mut self, _shared: &mut Shared, _raylib: &mut RaylibHandle, _thread: &RaylibThread) {}
-    
-    /// Draws the main array
-    fn draw(&mut self, shared: &mut Shared, draw: &mut impl RaylibDraw, indices: &IdentityHashMap<usize, Color>);
-    /// Draws the auxiliary arrays
-    fn draw_aux(&mut self, shared: &mut Shared, draw: &mut impl RaylibDraw, indices: &IdentityHashMap<usize, Color>);
 }
 
 #[macro_export]
@@ -43,8 +52,9 @@ macro_rules! visual {
 
         $visual_struct: ident :: new($slf: ident) $new: block
 
-        $(init($init_shared: ident, $gui: ident, $init_raylib: ident, $init_thread: ident) $init: block)?
+        $(init($init_shared: ident, $init_gui: ident, $init_raylib: ident, $init_thread: ident) $init: block)?
         $(unload($unload_raylib: ident, $unload_thread: ident) $unload: block)?
+        $(config($config_shared: ident, $config_gui: ident, $config_raylib: ident, $config_thread: ident) $config: block)?
 
         $(prepare($prepare_shared: ident, $prepare_raylib: ident, $prepare_thread: ident) $prepare: block)?
         $(on_aux_on($aux_on_shared: ident, $aux_on_raylib: ident, $aux_on_thread: ident) $on_aux_on: block)?
@@ -72,25 +82,11 @@ macro_rules! visual {
                 fn init(
                     &mut $slf, 
                     $init_shared: &$crate::Shared, 
-                    $gui: &mut $crate::gui::Gui,                  
+                    $init_gui: &mut $crate::gui::Gui,                  
                     $init_raylib: &mut raylib::prelude::RaylibHandle,
                     $init_thread: &raylib::prelude::RaylibThread
                 ) -> Result<(), $crate::univm::object::ExecutionInterrupt> {
-                    use $crate::univm::object::ExecutionInterrupt;
-                    let _res: Result<(), ExecutionInterrupt> = {
-                        $init
-                        #[allow(unreachable_code)] Ok(())
-                    };
-
-                    #[allow(unreachable_code)]
-                    if let Err(e) = _res {
-                        match e {
-                            ExecutionInterrupt::Quit => return Err(e),
-                            _ => panic!("Visual styles can only return ExecutionInterrupts of type Quit")
-                        }
-                    }
-
-                    Ok(())
+                    $crate::__filter_execution_interrupts!($init)
                 }
             )?
 
@@ -101,6 +97,19 @@ macro_rules! visual {
                     $unload_thread: &raylib::prelude::RaylibThread
                 ) {
                     $unload
+                }
+            )?
+
+            $(
+                fn is_configurable(&$slf) -> bool { true }
+                fn config(
+                    &mut $slf, 
+                    $config_shared: &$crate::Shared, 
+                    $config_gui: &mut $crate::gui::Gui,                  
+                    $config_raylib: &mut raylib::prelude::RaylibHandle,
+                    $config_thread: &raylib::prelude::RaylibThread
+                ) -> Result<(), $crate::univm::object::ExecutionInterrupt> {
+                    $crate::__filter_execution_interrupts!($config)
                 }
             )?
 

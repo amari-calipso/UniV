@@ -177,3 +177,26 @@ pub fn report_errors<T: ToString>(msg: &str, errors: &Vec<T>) -> String {
     log!(TraceLogLevel::LOG_ERROR, "{}", error_buf);
     error_buf
 }
+
+#[macro_export]
+macro_rules! __filter_execution_interrupts {
+    ($body: expr) => {
+        {
+            use $crate::univm::object::ExecutionInterrupt;
+            let _res: Result<(), ExecutionInterrupt> = {
+                $body
+                #[allow(unreachable_code)] Ok(())
+            };
+
+            #[allow(unreachable_code)]
+            if let Err(e) = _res {
+                match e {
+                    ExecutionInterrupt::Quit => return Err(e),
+                    _ => panic!("Sound engines and visual styles can only return ExecutionInterrupts of type Quit")
+                }
+            }
+
+            Ok(())
+        }
+    };
+}

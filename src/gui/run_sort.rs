@@ -43,14 +43,14 @@ impl Gui {
                     self.global_x_offset, 
                     self.global_y_offset
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .size(
                 [
                     self.resolution_x - self.global_x_offset * 2.0, 
                     self.resolution_y - self.global_y_offset * 2.0
                 ], 
-                imgui::Condition::Appearing
+                imgui::Condition::Always
             )
             .no_decoration()
             .movable(false)

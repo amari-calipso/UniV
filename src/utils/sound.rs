@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, sync::Arc};
+use std::sync::Arc;
 
 use rustysynth::{SoundFont, Synthesizer, SynthesizerSettings};
 
@@ -27,7 +27,7 @@ mod midi {
 }
 
 pub struct BaseSoundFontEngine {
-    pub synthesizer: OnceCell<Synthesizer>,
+    pub synthesizer: Option<Synthesizer>,
     pub decay: f64,
 }
 
@@ -39,7 +39,7 @@ impl BaseSoundFontEngine {
 
     pub fn new() -> Self {
         Self { 
-            synthesizer: OnceCell::new(), 
+            synthesizer: None, 
             decay: BaseSoundFontEngine::DEFAULT_DECAY 
         }
     }
@@ -66,13 +66,13 @@ impl BaseSoundFontEngine {
             0
         );
 
-        let _ = self.synthesizer.set(synth);
+        self.synthesizer = Some(synth);
     }
 
     pub fn play(&mut self, value: i64, max: i64, length: usize) -> Vec<i16> {
         let note = (24.0 + value as f64 * 67.0 / max as f64) as i32;
         
-        if let Some(synth) = self.synthesizer.get_mut() {
+        if let Some(synth) = &mut self.synthesizer {
             synth.note_on(0, note, BaseSoundFontEngine::VELOCITY);
 
             let full_length = length + (SAMPLE_RATE as f64 * self.decay) as usize;
