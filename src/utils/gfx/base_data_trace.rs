@@ -1,6 +1,8 @@
-use raylib::{color::Color, math::{Rectangle, Vector2}, prelude::{RaylibDraw, RaylibTextureModeExt}, texture::{RaylibTexture2D, RenderTexture2D}, RaylibHandle, RaylibThread};
+use std::{fs::File, io::{Seek, SeekFrom, Write}, iter::repeat};
 
-use crate::{value::Value, Shared, REFERENCE_FRAMERATE};
+use raylib::{color::Color, ffi::TraceLogLevel, math::{Rectangle, Vector2}, prelude::{RaylibDraw, RaylibTextureModeExt}, texture::{RaylibTexture2D, RenderTexture2D}, RaylibHandle, RaylibThread};
+
+use crate::{log, program_dir, value::Value, Shared, LOG_LEVEL, REFERENCE_FRAMERATE};
 
 use super::line_visual::LineVisual;
 
@@ -14,6 +16,11 @@ pub struct BaseDataTrace {
     pub old_aux:      Vec<Value>,
     pub aux_texture:  Option<RenderTexture2D>,
     aux_swap_texture: Option<RenderTexture2D>,
+
+    pub should_export: bool,
+    export_buf: Option<Vec<u8>>,
+    output_height: i32,
+    output: Option<File>,
 
     frame_counter: u64,
 }
@@ -30,6 +37,10 @@ impl BaseDataTrace {
             old_aux: Vec::new(), 
             aux_texture: None,
             aux_swap_texture: None, 
+            should_export: true,
+            export_buf: None,
+            output_height: 0,
+            output: None,
             frame_counter: 0
         }
     }
@@ -57,13 +68,139 @@ impl BaseDataTrace {
             rl.load_render_texture(thread, width, height / 4)
                 .expect("Could not load render texture")
         );
+
+        if self.should_export {
+            let needed_cap = (width * height * 3) as usize;
+            if let Some(buf) = &mut self.export_buf {
+                if needed_cap > buf.capacity() {
+                    buf.reserve(needed_cap - buf.capacity());
+                }
+            } else {
+                self.export_buf = Some(Vec::with_capacity(needed_cap))
+            }
+        }
     }
 
-    pub fn prepare(&mut self, shared: &Shared, rl: &RaylibHandle) {
+    fn write(file: &mut File, data: &[u8]) {
+        if let Err(e) = file.write(data) {
+            log!(TraceLogLevel::LOG_ERROR, "Could not write to data trace export file");
+            log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+        }
+    }
+
+    fn load_texture_to_ram(texture: &mut Option<RenderTexture2D>, rl: &mut RaylibHandle) -> raylib::ffi::Image {
+        rl.set_trace_log(TraceLogLevel::LOG_NONE); // disables logs from loading image from texture and unloading
+
+        let raw_texture = texture.take().unwrap().to_raw();
+        let image = unsafe { raylib::ffi::LoadImageFromTexture(raw_texture.texture) };
+        *texture = Some(unsafe { RenderTexture2D::from_raw(raw_texture) });
+
+        rl.set_trace_log(LOG_LEVEL);
+
+        image
+    }
+    
+    fn write_image_chunk(buf: &mut Vec<u8>, file: &mut File, image: raylib::ffi::Image) {
+        let image_data = unsafe {
+            std::slice::from_raw_parts(image.data as *const u8, (image.width * image.height * 4) as usize)
+        };
+
+        let width = image.width as usize;
+        let height = image.height as usize;
+
+        buf.clear();
+
+        for y in (0 .. height).rev() {
+            for x in 0 .. width as usize  {
+                let idx = (y * width + x) * 4; // 4 bytes for RGBA
+                buf.extend_from_slice(&image_data[idx..idx + 3]); // 3 bytes for RGB
+            }
+
+            let padding = width * 3 % 4; // rows must be 4 bytes aligned
+            if padding != 0 {
+                buf.extend(repeat(0).take(padding));
+            }
+        }
+
+        Self::write(file, buf);
+    }
+
+    pub fn prepare(&mut self, shared: &Shared, rl: &mut RaylibHandle) {
         self.base.prepare(shared, rl);
 
         if self.old_array.capacity() < shared.array.len() {
             self.old_array.reserve(shared.array.len() - self.old_array.capacity());
+        }
+
+        if self.should_export {
+            const HEIGHT_BYTES_OFFSET: u64 = 0x16;
+            const SIZE_BYTES_OFFSET: u64 = 0x02;
+            const DIB_HEADER_SIZE: u32 = 40;
+            const HEADER_SIZE: i32 = DIB_HEADER_SIZE as i32 + 14;
+
+            if let Some(mut f) = self.output.take() {
+                let remaining = self.output_height % self.main_texture.as_ref().unwrap().height();
+                if remaining != 0 {
+                    let mut chunk = Self::load_texture_to_ram(&mut self.main_texture, rl);
+
+                    unsafe { 
+                        raylib::ffi::ImageCrop(
+                            &mut chunk, 
+                            raylib::ffi::Rectangle { 
+                                x: 0.0, 
+                                y: (chunk.height - remaining) as f32,
+                                width: chunk.width as f32,
+                                height: remaining as f32
+                            }
+                        );
+                    }
+
+                    Self::write_image_chunk(self.export_buf.as_mut().unwrap(), &mut f, chunk);
+                }
+
+                if let Err(e) = f.seek(SeekFrom::Start(SIZE_BYTES_OFFSET)) {
+                    log!(TraceLogLevel::LOG_ERROR, "Could not finish writing data trace export file");
+                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                } else {
+                    Self::write(&mut f, &(self.main_texture.as_ref().unwrap().width() * self.output_height * 3 + HEADER_SIZE).to_le_bytes());
+                }
+
+                if let Err(e) = f.seek(SeekFrom::Start(HEIGHT_BYTES_OFFSET)) {
+                    log!(TraceLogLevel::LOG_ERROR, "Could not finish writing data trace export file");
+                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                } else {
+                    Self::write(&mut f, &self.output_height.to_le_bytes());
+                }
+
+                self.output_height = 0;
+            }
+
+            match File::create(program_dir!().join(format!("data-trace-{}.bmp", self.frame_counter))) {
+                Ok(mut f) => {
+                    // bitmap header
+                    Self::write(&mut f, b"BM");
+                    Self::write(&mut f, &0u32.to_le_bytes()); // size of file (computed later)
+                    Self::write(&mut f, &0u32.to_le_bytes()); // unused
+                    Self::write(&mut f, &(HEADER_SIZE as u32).to_le_bytes()); // data offset
+                    // dib header
+                    Self::write(&mut f, &DIB_HEADER_SIZE.to_le_bytes()); // size of header
+                    Self::write(&mut f, &self.main_texture.as_ref().unwrap().width().to_le_bytes()); // width
+                    Self::write(&mut f, &0i32.to_le_bytes()); // height (computed later)
+                    Self::write(&mut f, &1u16.to_le_bytes()); // color planes
+                    Self::write(&mut f, &24u16.to_le_bytes()); // bits per pixel
+                    Self::write(&mut f, &0u32.to_le_bytes()); // compression method (none, BI_RGB)
+                    Self::write(&mut f, &0u32.to_le_bytes()); // image size (can be 0 for BI_RGB)
+                    Self::write(&mut f, &2835i32.to_le_bytes()); // pixel per meter horizontal
+                    Self::write(&mut f, &2835i32.to_le_bytes()); // pixel per meter vertical
+                    Self::write(&mut f, &0u32.to_le_bytes()); // number of colors (can be 0 for 2^n)
+                    Self::write(&mut f, &0u32.to_le_bytes()); // number of important colors (whatever that means, usually ignored)
+                    self.output = Some(f);
+                }
+                Err(e) => {
+                    log!(TraceLogLevel::LOG_ERROR, "Could not open data trace export file");
+                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                }
+            }
         }
     }
 
@@ -148,10 +285,23 @@ impl BaseDataTrace {
     }
 
     pub fn update_main(&mut self, shared: &Shared, rl: &mut RaylibHandle, thread: &RaylibThread) -> bool {
-        Self::update(
+        if Self::update(
             self.main_texture.as_mut().unwrap(), self.swap_texture.as_mut().unwrap(),
             &mut self.old_array, &shared.array, rl, thread
-        )
+        ) {
+            if let Some(output) = &mut self.output {
+                self.output_height += 1;
+
+                if self.output_height % self.main_texture.as_ref().unwrap().height() == 0 {
+                    let chunk = Self::load_texture_to_ram(&mut self.main_texture, rl);
+                    Self::write_image_chunk(self.export_buf.as_mut().unwrap(), output, chunk);
+                }
+            }
+
+            true
+        } else {
+            false
+        }
     } 
 
     pub fn update_aux(&mut self, shared: &Shared, rl: &mut RaylibHandle, thread: &RaylibThread) -> bool {
