@@ -156,6 +156,7 @@ impl BaseDataTrace {
                     }
 
                     Self::write_image_chunk(self.export_buf.as_mut().unwrap(), &mut f, chunk);
+                    unsafe { raylib::ffi::UnloadImage(chunk) };
                 }
 
                 if let Err(e) = f.seek(SeekFrom::Start(SIZE_BYTES_OFFSET)) {
@@ -295,6 +296,7 @@ impl BaseDataTrace {
                 if self.output_height % self.main_texture.as_ref().unwrap().height() == 0 {
                     let chunk = Self::load_texture_to_ram(&mut self.main_texture, rl);
                     Self::write_image_chunk(self.export_buf.as_mut().unwrap(), output, chunk);
+                    unsafe { raylib::ffi::UnloadImage(chunk) };
                 }
             }
 
