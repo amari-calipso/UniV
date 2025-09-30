@@ -51,8 +51,9 @@ pub struct SoundInfo {
 }
 
 pub struct Gui {
-    imgui: imgui::Context,
+    pub imgui: imgui::Context,
     renderer: Option<raylib_imgui_rs::Renderer>,
+
     pub build_fn: fn(&mut Self) -> bool,
 
     pub target_fps: u32,
@@ -93,7 +94,7 @@ pub struct Gui {
 }
 
 impl Gui {
-    const ALPHA: f32 = 0.8;
+    pub const ALPHA: f32 = 0.8;
 
     const DEFAULT_ARRAY_LENGTH: usize = 2048;
     const DEFAULT_UNIQUE_AMT: usize = Gui::DEFAULT_ARRAY_LENGTH / 2;
@@ -114,10 +115,10 @@ impl Gui {
     const OK_BUTTON_X_SIZE: f32 = 100.0;
     const OK_BUTTON_Y_SIZE: f32 = 50.0;
 
-    const SAVE_BUTTON_X_SIZE: f32 = Gui::OK_BUTTON_X_SIZE;
-    const SAVE_BUTTON_Y_SIZE: f32 = Gui::OK_BUTTON_Y_SIZE;
+    pub const SAVE_BUTTON_X_SIZE: f32 = Gui::OK_BUTTON_X_SIZE;
+    pub const SAVE_BUTTON_Y_SIZE: f32 = Gui::OK_BUTTON_Y_SIZE;
 
-    const BACK_BUTTON_Y_SIZE: f32 = 20.0;
+    pub const BACK_BUTTON_Y_SIZE: f32 = 20.0;
 
     pub fn new() -> Self {
         let mut imgui = imgui::Context::create();
@@ -202,28 +203,40 @@ impl Gui {
         false
     }
 
-    pub fn run(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+    /// Initializes raylib for GUI mode. Useful for manual GUIs (that is, when not using [Self::run] or [Self::draw_once])
+    /// 
+    /// Should be called before the GUI loop
+    pub fn begin(&mut self, rl: &mut RaylibHandle) {
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
         rl.set_target_fps(get_monitor_refresh_rate(get_current_monitor()) as u32);
         rl.set_trace_log(LOG_LEVEL);
+    }
 
-        let mut quit = true;
-
-        while !rl.window_should_close() {
-            self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
-
-            let done = (self.build_fn)(self);
-
-            let mut draw = rl.begin_drawing(thread);
-            draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
-            self.renderer.as_ref().unwrap().render(&mut self.imgui, &mut draw);
-
-            if done {
-                quit = false;
-                break;
-            }
+    /// Updates the state of the renderer. Useful for manual GUIs (that is, when not using [Self::run] or [Self::draw_once])
+    /// 
+    /// Should be called before [Self::render] and the GUI is built
+    pub fn update(&mut self, rl: &mut RaylibHandle) -> Result<(), ExecutionInterrupt> {
+        if rl.window_should_close() {
+            return Err(ExecutionInterrupt::Quit)
         }
 
+        self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
+        Ok(())
+    }
+
+    /// Renders the GUI onto the screen. Useful for manual GUIs (that is, when not using [Self::run] or [Self::draw_once])
+    /// 
+    /// Should be called after [Self::update] and the GUI is built
+    pub fn render(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) {
+        let mut draw = rl.begin_drawing(thread);
+        draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
+        self.renderer.as_ref().unwrap().render(&mut self.imgui, &mut draw);
+    }
+
+    /// Restores state initially set with [Gui::begin]. Useful for manual GUIs (that is, when not using [Self::run] or [Self::draw_once])
+    /// 
+    /// Should be called after the GUI loop
+    pub fn end(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) {
         // restores old background, so that if another window is drawn, the old one doesn't get shown
         {
             let mut draw = rl.begin_drawing(thread);
@@ -233,24 +246,29 @@ impl Gui {
         rl.set_trace_log(TraceLogLevel::LOG_NONE);
         rl.set_target_fps(self.target_fps);
         rl.set_trace_log(LOG_LEVEL);
-        
-        if quit {
-            Err(ExecutionInterrupt::Quit)
-        } else {
-            Ok(())
+    }
+
+    pub fn run(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+        self.begin(rl);
+
+        loop {
+            self.update(rl)?;
+            let done = (self.build_fn)(self);
+            self.render(rl, thread);
+
+            if done {
+                break;
+            }
         }
+
+        self.end(rl, thread);
+        Ok(())
     }
 
     pub fn draw_once(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
-        if rl.window_should_close() {
-            return Err(ExecutionInterrupt::Quit);
-        }
-
-        self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
+        self.update(rl)?;
         (self.build_fn)(self);
-        let mut draw = rl.begin_drawing(thread);
-        draw.draw_texture(self.background.as_ref().unwrap(), 0, 0, Color::WHITE);
-        self.renderer.as_ref().unwrap().render(&mut self.imgui, &mut draw);
+        self.render(rl, thread);
         Ok(())
     }
 }

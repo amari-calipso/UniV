@@ -1,4 +1,4 @@
-use raylib::{math::Vector2, prelude::RaylibDraw, text::WeakFont};
+use raylib::{math::Vector2, prelude::RaylibDraw, text::WeakFont, texture::Image};
 use crate::{DEFAULT_SPACING_X, DEFAULT_SPACING_Y};
 
 pub mod line_visual;
@@ -6,6 +6,42 @@ pub mod dots_visual;
 pub mod base_circle_visual;
 pub mod circle_visual;
 pub mod base_data_trace;
+
+/// Image formats supported by raylib for export
+#[derive(Clone, Copy)]
+pub enum ImageFormat {
+    Jpeg,
+    Png,
+    Tga,
+    Bmp,
+}
+
+impl ImageFormat {
+    pub fn from_str(ext: &str) -> Option<Self> {
+        match ext {
+            "jpg" | "jpeg" => Some(Self::Jpeg),
+            "png" => Some(Self::Png),
+            "tga" => Some(Self::Tga),
+            "bmp" => Some(Self::Bmp),
+            _ => None
+        }
+    }
+
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Jpeg => "jpg",
+            Self::Png  => "png",
+            Self::Tga  => "tga",
+            Self::Bmp  => "bmp",
+        }
+    }
+
+    pub const fn all() -> &'static [Self] {
+        &[
+            Self::Bmp, Self::Jpeg, Self::Png, Self::Tga
+        ]
+    }
+}
 
 #[macro_export]
 macro_rules! rgb_color {
@@ -95,4 +131,8 @@ pub fn draw_outline_text_right(
         
         pos.y += size.y + outline_size + DEFAULT_SPACING_Y;
     }
+}
+
+pub fn get_image_bytes(image: &Image) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(image.data as *const u8, (image.width * image.height * 4) as usize) }
 }

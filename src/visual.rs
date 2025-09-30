@@ -38,6 +38,8 @@ pub trait Visual {
     fn on_aux_on(&mut self, _shared: &mut Shared, _raylib: &mut RaylibHandle, _thread: &RaylibThread) {}
     /// Optional: Is called when the auxiliary visual is disabled, by removing all auxiliary arrays for example
     fn on_aux_off(&mut self, _shared: &mut Shared, _raylib: &mut RaylibHandle, _thread: &RaylibThread) {}
+    /// Optional: Is called when the current algorithm finishes running and any generation process should be finalized
+    fn finalize(&mut self, _shared: &mut Shared, _raylib: &mut RaylibHandle, _thread: &RaylibThread) {}
 
     /// Optional: Is called before starting the draw process.
     /// Useful for setup that must happen before the draw handle is created
@@ -59,6 +61,7 @@ macro_rules! visual {
         $(prepare($prepare_shared: ident, $prepare_raylib: ident, $prepare_thread: ident) $prepare: block)?
         $(on_aux_on($aux_on_shared: ident, $aux_on_raylib: ident, $aux_on_thread: ident) $on_aux_on: block)?
         $(on_aux_off($aux_off_shared: ident, $aux_off_raylib: ident, $aux_off_thread: ident) $on_aux_off: block)?
+        $(finalize($finalize_shared: ident, $finalize_raylib: ident, $finalize_thread: ident) $finalize: block)?
 
         $(pre_draw($pre_draw_shared: ident, $pre_draw_raylib: ident, $pre_draw_thread: ident) $pre_draw: block)?
         
@@ -143,6 +146,17 @@ macro_rules! visual {
                     $aux_off_thread: &raylib::prelude::RaylibThread
                 ) {
                     $on_aux_off
+                }
+            )?
+
+            $(
+                fn finalize(
+                    &mut $slf, 
+                    $finalize_shared: &mut $crate::Shared, 
+                    $finalize_raylib: &mut raylib::prelude::RaylibHandle,
+                    $finalize_thread: &raylib::prelude::RaylibThread
+                ) {
+                    $finalize
                 }
             )?
 

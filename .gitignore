@@ -23,6 +23,9 @@ dev_util.exe
 # third-party languages headers
 /headers/
 
+# data trace exports
+data-trace-*
+
 # render output
 output.mp4
 tmp.mp4
