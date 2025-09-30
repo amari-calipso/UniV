@@ -134,6 +134,8 @@ pub struct Shared {
 
     pub fps: u32,
     pub reverb: bool,
+
+    unique_id: u64
 }
 
 #[derive(Debug)]
@@ -374,9 +376,17 @@ impl Shared {
             aux_heatmap: HeatMap::new(),
 
             fps: REFERENCE_FRAMERATE,
-            reverb: false
+            reverb: false,
+
+            unique_id: 0
         }
     }
+
+    pub fn get_unique_id(&mut self) -> u64 {
+        let tmp = self.unique_id;
+        self.unique_id += 1;
+        tmp
+    } 
 }
 
 impl Render {
@@ -2601,7 +2611,9 @@ impl UniV {
         }
     }
 
-    fn finalize_render(&mut self) -> Result<(), ExecutionInterrupt> {
+    fn finalize(&mut self) -> Result<(), ExecutionInterrupt> {
+        get_visual!(self).finalize(&mut self.shared, get_expect_mut!(self.rl_handle), get_expect!(self.rl_thread));
+        
         if let Some(mut ffmpeg) = self.render.ffmpeg.take() {
             // close ffmpeg pipes
             ffmpeg.video.stdin.take();
@@ -3187,14 +3199,14 @@ impl UniV {
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
-                                self.finalize_render()?;
+                                self.finalize()?;
                                 continue;
                             } else {
                                 return Err(e);
                             }
                         }
 
-                        self.finalize_render()?;
+                        self.finalize()?;
 
                         self.gui.build_fn = Gui::selection;
                         self.gui.selection.set(
@@ -3276,7 +3288,7 @@ impl UniV {
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
-                                self.finalize_render()?;
+                                self.finalize()?;
                                 self.user_values.clear();
                                 continue;
                             } else {
@@ -3284,7 +3296,7 @@ impl UniV {
                             }
                         }
 
-                        self.finalize_render()?;
+                        self.finalize()?;
                         self.user_values.clear();
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set("Finished", "All sorts have been visualized").unwrap();
@@ -3341,7 +3353,7 @@ impl UniV {
                         ) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
-                                self.finalize_render()?;
+                                self.finalize()?;
                                 self.user_values.clear();
                                 continue;
                             } else {
@@ -3349,7 +3361,7 @@ impl UniV {
                             }
                         }
 
-                        self.finalize_render()?;
+                        self.finalize()?;
                         self.user_values.clear();
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set("Finished", "All shuffles have been visualized").unwrap();
@@ -3391,14 +3403,14 @@ impl UniV {
                         if let Err(e) = self.execute_automation(automation.source, automation.filename) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
-                                self.finalize_render()?;
+                                self.finalize()?;
                                 continue;
                             } else {
                                 return Err(e);
                             }
                         }
 
-                        self.finalize_render()?;
+                        self.finalize()?;
                         self.gui.build_fn = Gui::popup;
                         self.gui.popup.set("Finished", "Automation complete").unwrap();
                         self.run_gui()?;

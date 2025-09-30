@@ -20,8 +20,13 @@ visual! {
         }
     }
 
-    init(_shared, _gui, rl, thread) {
+    init(_shared, gui, rl, thread) {
         self.base.init(rl, thread);
+        self.base.default_config_init("DataTrace", gui, rl, thread)?;
+    }
+
+    config(_shared, gui, rl, thread) {
+        self.base.default_config(gui, rl, thread)?;
     }
 
     prepare(shared, rl, _thread) {
@@ -36,6 +41,10 @@ visual! {
     
     on_aux_off(shared, rl, _thread) {
         self.base.on_aux_off(shared, rl);
+    }
+
+    finalize(shared, rl, _thread) {
+        self.base.finalize(shared, rl);
     }
 
     pre_draw(shared, rl, thread) {
