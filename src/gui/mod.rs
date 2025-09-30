@@ -266,11 +266,7 @@ impl Gui {
     }
 
     pub fn draw_once(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
-        if rl.window_should_close() {
-            return Err(ExecutionInterrupt::Quit);
-        }
-
-        self.renderer.as_mut().unwrap().update(&mut self.imgui, rl);
+        self.update(rl)?;
         (self.build_fn)(self);
         self.render(rl, thread);
         Ok(())
