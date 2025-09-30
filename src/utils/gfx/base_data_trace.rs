@@ -105,7 +105,7 @@ macro_rules! data_trace_common_config_ui {
 
 #[macro_export]
 macro_rules! data_trace_default_save_row {
-    ($base: expr, $running: ident, $ui: expr, $should_export: expr, $current_format: expr, $all_formats: expr) => {
+    ($base: expr, $running: ident, $ui: expr, $should_export: expr, $current_format: expr, $all_formats: expr, $name: expr) => {
         {
             use $crate::gui::Gui;
             use $crate::utils::gfx::ImageFormat;
@@ -135,7 +135,7 @@ macro_rules! data_trace_default_save_row {
                 log!(TraceLogLevel::LOG_INFO, "Saving configuration");
                 
                 let settings = DefaultDataTraceSettings { export_as };
-                if let Err(e) = settings.save("DataTrace") {
+                if let Err(e) = settings.save($name) {
                     log!(TraceLogLevel::LOG_ERROR, "Could not save configuration");
                     log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
                 }
@@ -210,7 +210,7 @@ impl BaseDataTrace {
         Ok(())
     }
 
-    pub fn default_config(&mut self, gui: &mut Gui, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
+    pub fn default_config(&mut self, config_name: &str, gui: &mut Gui, rl: &mut RaylibHandle, thread: &RaylibThread) -> Result<(), ExecutionInterrupt> {
         let resolution_x = rl.get_screen_width() as f32;
         let resolution_y = rl.get_screen_height() as f32;
 
@@ -237,18 +237,18 @@ impl BaseDataTrace {
 
             let ui = gui.imgui.new_frame();
             ui.window("Data Trace configuration")
-                .size(size, imgui::Condition::Always)
+                .size(size, imgui::Condition::Appearing)
                 .position(
                     [
                         resolution_x / 2.0 - size[0] / 2.0, 
                         resolution_y / 2.0 - size[1] / 2.0
                     ], 
-                    imgui::Condition::Always
+                    imgui::Condition::Appearing
                 )
                 .bg_alpha(Gui::ALPHA)
                 .build(|| {
                     data_trace_common_config_ui!(ui, &mut should_export, &mut current_format, &all_formats);
-                    data_trace_default_save_row!(self, running, ui, should_export, current_format, all_formats);
+                    data_trace_default_save_row!(self, running, ui, should_export, current_format, all_formats, config_name);
                 });
 
             gui.render(rl, thread);

@@ -44,14 +44,14 @@ impl Gui {
                     self.resolution_x / 2.0 - self.small_window_size_x / 2.0, 
                     self.resolution_y / 2.0 - self.small_window_size_y / 2.0
                 ], 
-                imgui::Condition::Always
+                imgui::Condition::Appearing
             )
             .size(
                 [
                     self.small_window_size_x, 
                     self.small_window_size_y
                 ], 
-                imgui::Condition::Always
+                imgui::Condition::Appearing
             )
             .bg_alpha(Gui::ALPHA)
             .build(|| {

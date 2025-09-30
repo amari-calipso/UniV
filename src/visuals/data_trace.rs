@@ -2,6 +2,8 @@ use raylib::{color::Color, ffi::Vector2, prelude::{RaylibDraw, RaylibTextureMode
 
 use crate::{utils::gfx::{base_data_trace::BaseDataTrace, line_visual::LineVisual}, visual};
 
+const CONFIG_NAME: &str = "DataTrace";
+
 pub struct DataTrace {
     base: BaseDataTrace,
     color_const: f64,
@@ -22,11 +24,11 @@ visual! {
 
     init(_shared, gui, rl, thread) {
         self.base.init(rl, thread);
-        self.base.default_config_init("DataTrace", gui, rl, thread)?;
+        self.base.default_config_init(CONFIG_NAME, gui, rl, thread)?;
     }
 
     config(_shared, gui, rl, thread) {
-        self.base.default_config(gui, rl, thread)?;
+        self.base.default_config(CONFIG_NAME, gui, rl, thread)?;
     }
 
     prepare(shared, rl, _thread) {
