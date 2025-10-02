@@ -8,11 +8,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, macos-13]
+        os: [macos-latest, macos-15-intel]
         include:
           - os: macos-latest
             rust_toolchain: stable
-          - os: macos-13
+          - os: macos-15-intel
             rust_toolchain: stable
     steps:
       - uses: actions/checkout@v4
