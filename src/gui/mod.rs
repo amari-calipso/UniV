@@ -13,7 +13,7 @@ use selection::Selection;
 use settings::Settings;
 use text_input::TextInput;
 
-use crate::{univm::object::ExecutionInterrupt, LOG_LEVEL, REFERENCE_FRAMERATE};
+use crate::{gui::configure_stats::ConfigureStats, univm::object::ExecutionInterrupt, LOG_LEVEL, REFERENCE_FRAMERATE};
 
 mod run_sort;
 mod selection;
@@ -25,6 +25,7 @@ mod settings;
 mod run_all_sorts;
 mod run_all_shuffles;
 mod automation_selection;
+mod configure_stats;
 
 #[derive(Clone)]
 pub enum FileOption {
@@ -71,6 +72,8 @@ pub struct Gui {
     medium_window_size_y: f32,
     settings_window_size_x: f32,
     settings_window_size_y: f32,
+    config_stats_window_size_x: f32,
+    config_stats_window_size_y: f32,
 
     pub distributions:    Vec<Rc<str>>,
     pub shuffles:         Vec<Rc<str>>,
@@ -91,6 +94,7 @@ pub struct Gui {
     pub run_all_sorts:        RunAllSorts,
     pub run_all_shuffles:     RunAllShuffles,
     pub automation_selection: AutomationSelection,
+    pub configure_stats:      ConfigureStats,
 }
 
 impl Gui {
@@ -106,6 +110,8 @@ impl Gui {
     const MEDIUM_WINDOW_DIV: f32 = 2.0;
     const SETTINGS_WINDOW_DIV_X: f32 = 2.0;
     const SETTINGS_WINDOW_DIV_Y: f32 = 1.15;
+    const CONFIG_STATS_WINDOW_DIV_X: f32 = 3.0;
+    const CONFIG_STATS_WINDOW_DIV_Y: f32 = 2.0;
 
     const ITEMS_Y_ADJUST: f32 = 10.0;
 
@@ -144,6 +150,8 @@ impl Gui {
             medium_window_size_y: 0.0,
             settings_window_size_x: 0.0,
             settings_window_size_y: 0.0,
+            config_stats_window_size_x: 0.0,
+            config_stats_window_size_y: 0.0,
 
             distributions: Vec::new(),
             shuffles: Vec::new(),
@@ -163,7 +171,8 @@ impl Gui {
             settings: Settings::new(),
             run_all_sorts: RunAllSorts::new(),
             run_all_shuffles: RunAllShuffles::new(),
-            automation_selection: AutomationSelection::new()
+            automation_selection: AutomationSelection::new(),
+            configure_stats: ConfigureStats::new(),
         }
     }
 
@@ -197,6 +206,8 @@ impl Gui {
         self.medium_window_size_y = self.resolution_y / Gui::MEDIUM_WINDOW_DIV;
         self.settings_window_size_x = self.resolution_x / Gui::SETTINGS_WINDOW_DIV_X;
         self.settings_window_size_y = self.resolution_y / Gui::SETTINGS_WINDOW_DIV_Y;
+        self.config_stats_window_size_x = self.resolution_x / Gui::CONFIG_STATS_WINDOW_DIV_X;
+        self.config_stats_window_size_y = self.resolution_y / Gui::CONFIG_STATS_WINDOW_DIV_Y;
     }
 
     fn placeholder_fn(&mut self) -> bool {

@@ -171,6 +171,13 @@ impl std::fmt::Debug for Audio {
     }
 }
 
+#[derive(Debug)]
+struct ArrayStats {
+    pub writes: u64,
+    pub reads:  u64,
+    pub swaps:  u64,
+}
+
 pub type LanguageLayerFn = fn(String, Rc<str>) -> Result<Vec<Expression>, Vec<String>>;
 
 pub struct UniV {
@@ -206,9 +213,8 @@ pub struct UniV {
     settings: UniVSettings,
     profile:  Profile,
 
-    writes:      u64,
-    swaps:       u64,
-    reads:       u64,
+    main_stats:  ArrayStats,
+    aux_stats:   ArrayStats,
     comparisons: u64,
     time:        f64,
 
@@ -255,6 +261,7 @@ pub struct UniV {
     main_hl: IdentityHashMap<usize, Color>,
     /// Stores processed highlights that belong to auxiliary arrays
     aux_hl: IdentityHashMap<usize, Color>,
+    text_buf: String,
 
     /// Render mode data
     render: Render,
@@ -310,9 +317,8 @@ impl UniV {
             settings: UniVSettings::new(),
             profile: Profile::new(),
 
-            writes: 0,
-            swaps: 0,
-            reads: 0,
+            main_stats: ArrayStats::new(),
+            aux_stats: ArrayStats::new(),
             comparisons: 0,
             time: 0.0,
 
@@ -347,6 +353,7 @@ impl UniV {
             adapt_hl_buf: Vec::new(),
             main_hl: HashMap::default(),
             aux_hl: HashMap::default(),
+            text_buf: String::new(),
 
             render: Render::new(),
 
@@ -404,6 +411,22 @@ impl Render {
     }
 }
 
+impl ArrayStats {
+    pub fn new() -> Self {
+        ArrayStats {
+            writes: 0,
+            swaps: 0,
+            reads: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.writes = 0;
+        self.swaps = 0;
+        self.reads = 0;
+    }
+}
+
 // curr_visual will never be out of bounds unless there's a bug in the program's core.
 // so this is safe enough, and it gives us a speed boost in graphics routines, where we need it the most
 macro_rules! get_visual {
@@ -428,52 +451,87 @@ macro_rules! get_sound {
 macro_rules! render_stats {
     ($slf: ident, $draw: expr, $fps: expr) => {
         if $slf.settings.show_text {
-            let full_running = format!("{}: {}", $slf.current_category, $slf.currently_running);
+            $slf.text_buf.clear();
+            
+            if $slf.settings.stats.array_length {
+                let len = {
+                    let array = $slf.array.borrow();
+                    expect_list!(array).items.len()
+                };
 
-            let running_text;
-            if $slf.current_category == "" {
-                running_text = &$slf.currently_running;
-            } else {
-                running_text = &full_running;
+                $slf.text_buf.push_str("Array length: ");
+                $slf.text_buf.push_str(&len.to_formatted_string(&LOCALE));
+                $slf.text_buf.push('\n');
             }
 
-            let time;
-            let unit;
-            if $slf.time > 1000.0 {
-                time = $slf.time / 1000.0;
-                unit = "s";
-            } else {
-                time = $slf.time;
-                unit = "ms";
+            if $slf.settings.stats.currently_running {
+                if $slf.current_category == "" {
+                    $slf.text_buf.push_str(&$slf.currently_running);
+                    $slf.text_buf.push('\n');
+                } else {
+                    $slf.text_buf.push_str(format!("{}: {}\n", $slf.current_category, $slf.currently_running).as_str());
+                }
             }
 
-            let len = {
-                let array = $slf.array.borrow();
-                expect_list!(array).items.len()
-            };
+            if $slf.settings.stats.array_length || $slf.settings.stats.currently_running {
+                $slf.text_buf.push('\n');
+            }
+
+            if let Some(mode) = $slf.settings.stats.writes {
+                $slf.text_buf.push_str("Writes: ");
+                $slf.text_buf.push_str(&mode.format($slf.main_stats.writes, $slf.aux_stats.writes));
+                $slf.text_buf.push('\n');
+            }
+
+            if let Some(mode) = $slf.settings.stats.swaps {
+                $slf.text_buf.push_str("Swaps: ");
+                $slf.text_buf.push_str(&mode.format($slf.main_stats.swaps, $slf.aux_stats.swaps));
+                $slf.text_buf.push('\n');
+            }
+
+            if $slf.settings.stats.writes.is_some() || $slf.settings.stats.swaps.is_some() {
+                $slf.text_buf.push('\n');
+            }
+
+            if let Some(mode) = $slf.settings.stats.reads {
+                $slf.text_buf.push_str("Reads: ");
+                $slf.text_buf.push_str(&mode.format($slf.main_stats.reads, $slf.aux_stats.reads));
+                $slf.text_buf.push('\n');
+            }
+
+            if $slf.settings.stats.comparisons {
+                $slf.text_buf.push_str("Comparisons: ");
+                $slf.text_buf.push_str(&$slf.comparisons.to_formatted_string(&LOCALE));
+                $slf.text_buf.push('\n');
+            } 
+
+            if $slf.settings.stats.reads.is_some() || $slf.settings.stats.comparisons {
+                $slf.text_buf.push('\n');
+            }
+
+            if $slf.settings.stats.time {
+                let time;
+                let unit;
+                if $slf.time > 1000.0 {
+                    time = $slf.time / 1000.0;
+                    unit = "s";
+                } else {
+                    time = $slf.time;
+                    unit = "ms";
+                }
+
+                $slf.text_buf.push_str("Estimated time elapsed: ");
+                $slf.text_buf.push_str(format!("{:.4} {}\n", time, unit).as_str());
+            }
+
+            if let Some(mode) = $slf.settings.stats.recursion_depth {
+                $slf.text_buf.push_str("Recursion depth: ");
+                $slf.text_buf.push_str(&mode.format($slf.vm.call_stack_depth, $slf.vm.max_call_stack_depth));
+                $slf.text_buf.push('\n');
+            }
 
             utils::gfx::draw_outline_text(
-                format!(
-                    concat!(
-                        "Array length: {}\n",
-                        "{}\n",
-                        "\n",
-                        "Writes: {}\n",
-                        "Swaps: {}\n",
-                        "\n",
-                        "Reads: {}\n",
-                        "Comparisons: {}\n",
-                        "\n",
-                        "Estimated time elapsed: {:.4} {}"
-                    ),
-                    len.to_formatted_string(&LOCALE),
-                    running_text,
-                    $slf.writes.to_formatted_string(&LOCALE),
-                    $slf.swaps.to_formatted_string(&LOCALE),
-                    $slf.reads.to_formatted_string(&LOCALE),
-                    $slf.comparisons.to_formatted_string(&LOCALE),
-                    time, unit
-                ).as_ref(),
+                $slf.text_buf.as_str(),
                 Vector2 { x: STATS_POS.x, y: STATS_POS.y },
                 $slf.font_size, get_expect!($slf.font), Color::WHITE, STATS_OUTLINE_SIZE,
                 $draw
@@ -566,9 +624,8 @@ fn samples_to_buf(buf: &mut Vec<u8>, samples: &Vec<i16>) {
 
 impl UniV {
     pub fn reset_stats(&mut self) {
-        self.writes = 0;
-        self.swaps = 0;
-        self.reads = 0;
+        self.main_stats.reset();
+        self.aux_stats.reset();
         self.comparisons = 0;
         self.time = 0.0;
     }

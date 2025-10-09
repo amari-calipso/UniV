@@ -1052,6 +1052,9 @@ macro_rules! tuple_assign {
             let mut any = $op.clone();
             any.set_lexeme("any");
 
+            let mut untracked_read = $op.clone();
+            untracked_read.set_lexeme("UniV_untrackedRead");
+
             let tmp_var = Box::new(Expression::Variable { name });
 
             Expression::Block {
@@ -1067,14 +1070,17 @@ macro_rules! tuple_assign {
                     Expression::Assign {
                         target: Box::new(x.to_ast($t)),
                         op: $op.clone(),
-                        value: Box::new(Expression::Subscript { 
-                            subscripted: tmp_var.clone(), 
-                            paren: $op.clone(), 
-                            index: Box::new(Expression::Literal { 
-                                value: i.to_string().into(), 
-                                tok: $op.clone(), 
-                                kind: LiteralKind::Int 
-                            })
+                        value: Box::new(Expression::Call {
+                            callee: Box::new(Expression::Variable { name: untracked_read.clone() }),
+                            paren: $op.clone(),
+                            args: vec![
+                                *tmp_var.clone(), 
+                                Expression::Literal { 
+                                    value: i.to_string().into(), 
+                                    tok: $op.clone(), 
+                                    kind: LiteralKind::Int 
+                                }
+                            ]
                         }),
                         type_spec: Some(Box::new(Expression::Variable { name: any.clone() })) 
                     }

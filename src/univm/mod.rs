@@ -473,7 +473,12 @@ pub struct UniVM {
     pub return_values: IdentityHashMap<usize, UniLValue>,
     scheduled_tasks: IdentityHashMap<usize, Task>,
     started_tasks: IdentityHashSet<usize>,
-    task_id: usize
+    task_id: usize,
+
+    /// Maximum call stack depth between all currently running tasks
+    pub call_stack_depth: usize,
+    /// Maximum call stack depth through the entire VM execution session
+    pub max_call_stack_depth: usize,
 }
 
 macro_rules! load_name {
@@ -502,7 +507,9 @@ impl UniVM {
             return_values: HashMap::default(),
             scheduled_tasks: HashMap::default(),
             started_tasks: HashSet::default(),
-            task_id: 0
+            task_id: 0,
+            call_stack_depth: 0,
+            max_call_stack_depth: 0
         }
     }
 
@@ -548,16 +555,28 @@ impl UniVM {
 
 impl UniV {
     pub fn execute(&mut self) -> Result<UniLValue, ExecutionInterrupt> {
+        self.vm.max_call_stack_depth = 0;
+
         VM_TASKS.with_borrow_mut(|tasks| {
             if tasks.is_empty() && self.vm.scheduled_tasks.is_empty() {
                 return Ok(UniLValue::Null);
             }
 
             while !(tasks.is_empty() && self.vm.scheduled_tasks.is_empty()) {
+                self.vm.call_stack_depth = 0;
+
                 for (task_id, task) in tasks.iter_mut() {
                     if !task.started && self.vm.started_tasks.contains(task_id) {
                         self.vm.started_tasks.remove(task_id);
                         task.started = true;
+                    }
+
+                    if task.call_stack.len() > self.vm.call_stack_depth {
+                        self.vm.call_stack_depth = task.call_stack.len();
+
+                        if self.vm.call_stack_depth > self.vm.max_call_stack_depth {
+                            self.vm.max_call_stack_depth = self.vm.call_stack_depth;
+                        }
                     }
 
                     if !task.started {
@@ -768,8 +787,13 @@ impl UniV {
                                                 }
                                             }
 
-                                            self.reads += 1;
                                             let aux = self.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+                                            if aux.is_none() {
+                                                self.main_stats.reads += 1;
+                                            } else {
+                                                self.aux_stats.reads += 1;
+                                            }
+
                                             self.highlights.push(HighlightInfo::from_idx_and_aux(list.convert_index(idx), aux));  
                                         } else {
                                             task.exception = Some(UniLValue::String(format!(
@@ -806,8 +830,14 @@ impl UniV {
                                                 }
                                             }
 
-                                            self.writes += 1;
                                             let aux = self.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+
+                                            if aux.is_none() {
+                                                self.main_stats.writes += 1;
+                                            } else {
+                                                self.aux_stats.writes += 1;
+                                            }
+
                                             self.highlights.push(HighlightInfo::from_idx_and_aux_write(list.convert_index(idx), aux));                     
                                         } else {
                                             task.exception = Some(UniLValue::String(format!(

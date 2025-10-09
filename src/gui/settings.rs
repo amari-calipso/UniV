@@ -129,6 +129,11 @@ impl Gui {
                     });
                 }
 
+                ui.same_line();
+                if ui.button("Configure") {
+                    self.build_fn = Gui::configure_stats;
+                }
+
                 ui.checkbox("Show auxiliary arrays", &mut self.settings.object.show_aux);
                 ui.checkbox("Show internal information", &mut self.settings.object.internal_info);
                 if ui.is_item_hovered() {

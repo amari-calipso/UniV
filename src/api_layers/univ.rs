@@ -574,7 +574,12 @@ api_layer_fn! {
         
         if let AnyObject::List(list) = &mut *array.borrow_mut() {
             with_timer!(univ, list.set_with_exception(i, args[2].clone(), univ)?);
-            univ.writes += 1;
+
+            if univ.get_optional_aux_id(array.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.writes += 1;
+            } else {
+                univ.aux_stats.writes += 1;
+            }
         } else {
             return Err(univ.vm.create_exception(UniLValue::String(format!(
                 "Expecting list as first argument of 'UniV_invisibleWrite' (got {})",
@@ -600,8 +605,13 @@ api_layer_fn! {
                 list.set(b, tmp).unwrap();
             });
 
-            univ.swaps += 1;
-            univ.writes += 2;
+            if univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.swaps  += 1;
+                univ.main_stats.writes += 2;
+            } else {
+                univ.aux_stats.swaps  += 1;
+                univ.aux_stats.writes += 2;
+            }
 
             Ok(right)
         } else {
@@ -618,11 +628,31 @@ api_layer_fn! {
         
         if let AnyObject::List(list) = &mut *array.borrow_mut() {
             let item = with_timer!(univ, list.get_with_exception(i, univ)?);
-            univ.reads += 1;
+
+            if univ.get_optional_aux_id(array.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.reads += 1;
+            } else {
+                univ.aux_stats.reads += 1;
+            }
+
             Ok(item)
         } else {
             Err(univ.vm.create_exception(UniLValue::String(format!(
                 "Expecting list as first argument of 'UniV_invisibleRead' (got {})",
+                args[0].stringify_type()
+            ).into())))
+        }
+    }
+
+    UniV_untrackedRead(args, [UniLType::List, UniLType::Int], univ, _task) -> (UniLType::Any) {
+        let array = expect_object(&args[0], "first argument of 'UniV_untrackedRead'", univ)?;
+        let i = expect_int(&args[1], "second argument of 'UniV_untrackedRead'", univ)?;
+        
+        if let AnyObject::List(list) = &mut *array.borrow_mut() {
+            Ok(list.get_with_exception(i, univ)?)
+        } else {
+            Err(univ.vm.create_exception(UniLValue::String(format!(
+                "Expecting list as first argument of 'UniV_untrackedRead' (got {})",
                 args[0].stringify_type()
             ).into())))
         }
@@ -633,7 +663,13 @@ api_layer_fn! {
 
         if let AnyObject::List(list) = &mut *obj.borrow_mut() {
             with_timer!(univ, list.items.push(args[1].clone()));
-            univ.writes += 1;
+
+            if univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.writes += 1;
+            } else {
+                univ.aux_stats.writes += 1;
+            }
+
             Ok(UniLValue::Null)
         } else {
             Err(univ.vm.create_exception(UniLValue::String(format!(
@@ -645,27 +681,53 @@ api_layer_fn! {
 
     UniV_addWrites(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
         let x = expect_int_strict(&args[0], "first argument of 'UniV_addWrites'", univ)?;
-        univ.writes = univ.writes.saturating_add_signed(x);
-        Ok(UniLValue::Int(univ.writes as i64))
+        univ.main_stats.writes = univ.main_stats.writes.saturating_add_signed(x);
+        Ok(UniLValue::Int(univ.main_stats.writes as i64))
     }
 
     UniV_addReads(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
         let x = expect_int_strict(&args[0], "first argument of 'UniV_addReads'", univ)?;
-        univ.reads = univ.reads.saturating_add_signed(x);
-        Ok(UniLValue::Int(univ.reads as i64))
+        univ.main_stats.reads = univ.main_stats.reads.saturating_add_signed(x);
+        Ok(UniLValue::Int(univ.main_stats.reads as i64))
     }
 
     UniV_addSwaps(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
         let x = expect_int_strict(&args[0], "first argument of 'UniV_addSwaps'", univ)?;
-        univ.swaps = univ.swaps.saturating_add_signed(x);
-        univ.writes = univ.writes.saturating_add_signed(x * 2);
-        Ok(UniLValue::Int(univ.swaps as i64))
+        univ.main_stats.swaps = univ.main_stats.swaps.saturating_add_signed(x);
+        univ.main_stats.writes = univ.main_stats.writes.saturating_add_signed(x * 2);
+        Ok(UniLValue::Int(univ.main_stats.swaps as i64))
     }
 
     UniV_addComparisons(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
         let x = expect_int_strict(&args[0], "first argument of 'UniV_addComparisons'", univ)?;
         univ.comparisons = univ.comparisons.saturating_add_signed(x);
-        univ.reads = univ.reads.saturating_add_signed(x * 2);
+        univ.main_stats.reads = univ.main_stats.reads.saturating_add_signed(x * 2);
+        Ok(UniLValue::Int(univ.comparisons as i64))
+    }
+
+    UniV_addAuxWrites(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
+        let x = expect_int_strict(&args[0], "first argument of 'UniV_addAuxWrites'", univ)?;
+        univ.aux_stats.writes = univ.aux_stats.writes.saturating_add_signed(x);
+        Ok(UniLValue::Int(univ.aux_stats.writes as i64))
+    }
+
+    UniV_addAuxReads(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
+        let x = expect_int_strict(&args[0], "first argument of 'UniV_addAuxReads'", univ)?;
+        univ.aux_stats.reads = univ.aux_stats.reads.saturating_add_signed(x);
+        Ok(UniLValue::Int(univ.aux_stats.reads as i64))
+    }
+
+    UniV_addAuxSwaps(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
+        let x = expect_int_strict(&args[0], "first argument of 'UniV_addAuxSwaps'", univ)?;
+        univ.aux_stats.swaps = univ.aux_stats.swaps.saturating_add_signed(x);
+        univ.aux_stats.writes = univ.aux_stats.writes.saturating_add_signed(x * 2);
+        Ok(UniLValue::Int(univ.aux_stats.swaps as i64))
+    }
+
+    UniV_addAuxComparisons(args, [UniLType::Int], univ, _task) -> (UniLType::Int) {
+        let x = expect_int_strict(&args[0], "first argument of 'UniV_addAuxComparisons'", univ)?;
+        univ.comparisons = univ.comparisons.saturating_add_signed(x);
+        univ.aux_stats.reads = univ.aux_stats.reads.saturating_add_signed(x * 2);
         Ok(UniLValue::Int(univ.comparisons as i64))
     }
 }

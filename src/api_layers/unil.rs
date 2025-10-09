@@ -271,10 +271,16 @@ api_layer_fn! {
                 list.set(b, left.clone()).unwrap();
             });
 
-            univ.swaps += 1;
-            univ.writes += 2;
-
             let aux = univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+
+            if aux.is_none() {
+                univ.main_stats.swaps  += 1;
+                univ.main_stats.writes += 2;
+            } else {
+                univ.aux_stats.swaps  += 1;
+                univ.aux_stats.writes += 2;
+            }
+
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(list.convert_index(a), aux));
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(list.convert_index(b), aux));
 
@@ -349,9 +355,15 @@ api_layer_fn! {
             let idx = list.items.len();
 
             with_timer!(univ, list.items.push(args[1].clone()));
-            univ.writes += 1;
 
             let aux = univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+
+            if aux.is_none() {
+                univ.main_stats.writes += 1;
+            } else {
+                univ.aux_stats.writes += 1;
+            }
+
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(idx, aux));
 
             Ok(UniLValue::Null)
@@ -368,11 +380,16 @@ api_layer_fn! {
 
         if let AnyObject::List(list) = &mut *obj.borrow_mut() {
             let value = with_timer!(univ, list.items.pop());
-            univ.writes += 1;
 
             let idx = list.items.len() - 1;
-
             let aux = univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject);
+
+            if aux.is_none() {
+                univ.main_stats.writes += 1;
+            } else {
+                univ.aux_stats.writes += 1;
+            }
+
             univ.highlights.push(HighlightInfo::from_idx_and_aux_write(idx, aux));
             
             Ok(value.unwrap_or(UniLValue::Null))
@@ -388,7 +405,12 @@ api_layer_fn! {
         let obj = expect_object(&args[0], "first argument of 'List_clear'", univ)?;
 
         if let AnyObject::List(list) = &mut *obj.borrow_mut() {
-            univ.writes += list.items.len() as u64;
+            if univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.writes += list.items.len() as u64;
+            } else {
+                univ.aux_stats.writes += list.items.len() as u64;
+            }
+
             with_timer!(univ, list.items.clear());
             Ok(UniLValue::Null)
         } else {

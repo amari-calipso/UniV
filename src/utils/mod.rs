@@ -178,6 +178,16 @@ pub fn report_errors<T: ToString>(msg: &str, errors: &Vec<T>) -> String {
     error_buf
 }
 
+pub fn linear_search<T: AsRef<str>, U: AsRef<str>>(haystack: &[T], needle: &U) -> Option<usize> {
+    for (i, item) in haystack.iter().enumerate() {
+        if item.as_ref() == needle.as_ref() {
+            return Some(i);
+        }
+    }
+
+    None
+}
+
 #[macro_export]
 macro_rules! __filter_execution_interrupts {
     ($body: expr) => {

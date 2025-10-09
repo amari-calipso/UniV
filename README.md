@@ -495,10 +495,14 @@ UniL also provides access to functions to interact with the visualizer
 - `List_invisiblePush(list: List, value: any) Null`: equivalent to `List_push(list, value)`, but the operation is not visualized;
 
 #### Manual statistics editing
-- `UniV_addWrites(Int) Null`: adds a given amount of writes to the writes counter;
-- `UniV_addReads(Int) Null`: adds a given amount of reads to the reads counter;
-- `UniV_addSwaps(Int) Null`: adds a given amount of swaps (and double the amount of writes) to the swaps and writes counters;
-- `UniV_addComparisons(Int) Null`: adds a given amount of comparisons (and double the amount of reads) to the comparisons and reads counters;
+- `UniV_addWrites(Int) Int`: adds a given amount of writes to the main array writes counter;
+- `UniV_addReads(Int) Int`: adds a given amount of reads to the main array reads counter;
+- `UniV_addSwaps(Int) Int`: adds a given amount of swaps (and double the amount of writes) to the main array swaps and writes counters;
+- `UniV_addComparisons(Int) Int`: adds a given amount of comparisons (and double the amount of reads) to the comparisons counter and main array reads counter;
+- `UniV_addAuxWrites(Int) Int`: adds a given amount of writes to the auxiliary arrays writes counter;
+- `UniV_addAuxReads(Int) Int`: adds a given amount of reads to the auxiliary arrays reads counter;
+- `UniV_addAuxSwaps(Int) Int`: adds a given amount of swaps (and double the amount of writes) to the auxiliary arrays swaps and writes counters;
+- `UniV_addAuxComparisons(Int) Int`: adds a given amount of comparisons (and double the amount of reads) to the comparisons counter and auxiliary arrays reads counter;
 
 #### Miscellaneous
 - `UniV_immediateSort(List, a: Int, b: Int) Null`: sorts a list from index a to index b (excluding the last element) "immediately", that is, the processing happens in the background, and only a linear pass is visualized. Useful for shuffles or placeholders;
