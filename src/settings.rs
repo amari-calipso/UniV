@@ -113,6 +113,7 @@ pub struct StatsSettings {
     pub comparisons: bool,
     pub time: bool,
     pub call_stack_depth: Option<CallStackDepthMode>,
+    pub recursion_depth: Option<CallStackDepthMode>,
 }
 
 impl StatsSettings {
@@ -126,6 +127,7 @@ impl StatsSettings {
             comparisons: true,
             time: true,
             call_stack_depth: None,
+            recursion_depth: None,
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, cmp::max, collections::{HashMap, HashSet}, rc::Rc};
 
 use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
@@ -479,6 +479,12 @@ pub struct UniVM {
     pub call_stack_depth: usize,
     /// Maximum call stack depth through the entire VM execution session
     pub max_call_stack_depth: usize,
+    /// Maximum recursion depth between all currently running tasks
+    pub recursion_depth: usize,
+    /// Maximum recursion depth through the entire VM execution session
+    pub max_recursion_depth: usize,
+
+    recursion_frequencies: Option<IdentityHashMap<u64, usize>>
 }
 
 macro_rules! load_name {
@@ -509,7 +515,10 @@ impl UniVM {
             started_tasks: HashSet::default(),
             task_id: 0,
             call_stack_depth: 0,
-            max_call_stack_depth: 0
+            max_call_stack_depth: 0,
+            recursion_depth: 0,
+            max_recursion_depth: 0,
+            recursion_frequencies: None
         }
     }
 
@@ -556,6 +565,7 @@ impl UniVM {
 impl UniV {
     pub fn execute(&mut self) -> Result<UniLValue, ExecutionInterrupt> {
         self.vm.max_call_stack_depth = 0;
+        self.vm.max_recursion_depth = 0;
 
         VM_TASKS.with_borrow_mut(|tasks| {
             if tasks.is_empty() && self.vm.scheduled_tasks.is_empty() {
@@ -564,6 +574,7 @@ impl UniV {
 
             while !(tasks.is_empty() && self.vm.scheduled_tasks.is_empty()) {
                 self.vm.call_stack_depth = 0;
+                self.vm.recursion_depth = 0;
 
                 for (task_id, task) in tasks.iter_mut() {
                     if !task.started && self.vm.started_tasks.contains(task_id) {
@@ -576,6 +587,33 @@ impl UniV {
 
                         if self.vm.call_stack_depth > self.vm.max_call_stack_depth {
                             self.vm.max_call_stack_depth = self.vm.call_stack_depth;
+                        }
+                    }
+
+                    if self.settings.stats.recursion_depth.is_some() && task.call_stack.len() != 0 {
+                        if let Some(frequencies) = &mut self.vm.recursion_frequencies {
+                            frequencies.clear();
+                        } else {
+                            self.vm.recursion_frequencies = Some(HashMap::default());
+                        }
+
+                        let frequencies = self.vm.recursion_frequencies.as_mut().unwrap();
+
+                        for address in &task.call_stack {
+                            if let Some(frequency) = frequencies.get_mut(address) {
+                                *frequency += 1;
+                            } else {
+                                frequencies.insert(*address, 1);
+                            }
+                        }
+
+                        let top_frequency = max(frequencies.values().cloned().max().unwrap(), 1) - 1;
+                        if top_frequency > self.vm.recursion_depth {
+                            self.vm.recursion_depth = top_frequency;
+
+                            if self.vm.recursion_depth > self.vm.max_recursion_depth {
+                                self.vm.max_recursion_depth = self.vm.recursion_depth;
+                            }
                         }
                     }
 

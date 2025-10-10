@@ -84,14 +84,23 @@ impl Gui {
         let mut reads_idx = 0usize;
         let mut call_stack_depth_enabled = true;
         let mut call_stack_depth_idx = 0usize;
+        let mut recursion_depth_enabled = true;
+        let mut recursion_depth_idx = 0usize;
 
         self.configure_stats.read_stat_option(self.settings.object.stats.writes, &mut writes_idx, &mut writes_enabled);
         self.configure_stats.read_stat_option(self.settings.object.stats.swaps,  &mut swaps_idx,  &mut swaps_enabled);
         self.configure_stats.read_stat_option(self.settings.object.stats.reads,  &mut reads_idx,  &mut reads_enabled);
+
         self.configure_stats.read_call_stack_depth_option(
             self.settings.object.stats.call_stack_depth, 
             &mut call_stack_depth_idx,  
             &mut call_stack_depth_enabled
+        );
+
+        self.configure_stats.read_call_stack_depth_option(
+            self.settings.object.stats.recursion_depth, 
+            &mut recursion_depth_idx,  
+            &mut recursion_depth_enabled
         );
 
         let ui = self.imgui.new_frame();
@@ -142,6 +151,9 @@ impl Gui {
                 ui.spacing();
 
                 call_stack_depth_gui!(self.configure_stats, ui, "Call stack depth", call_stack_depth_idx, call_stack_depth_enabled);
+                ui.spacing();
+
+                call_stack_depth_gui!(self.configure_stats, ui, "Recursion depth", recursion_depth_idx, recursion_depth_enabled);
 
                 ui.set_cursor_pos([ui.cursor_pos()[0], ui.window_content_region_max()[1] - Gui::BACK_BUTTON_Y_SIZE]);
                 if ui.button("Back") {
@@ -152,10 +164,17 @@ impl Gui {
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.writes, writes_idx, writes_enabled);
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.swaps,   swaps_idx,  swaps_enabled);
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.reads,   reads_idx,  reads_enabled);
+
         self.configure_stats.write_call_stack_depth_option(
             &mut self.settings.object.stats.call_stack_depth,   
             call_stack_depth_idx,  
             call_stack_depth_enabled
+        );
+
+        self.configure_stats.write_call_stack_depth_option(
+            &mut self.settings.object.stats.recursion_depth,   
+            recursion_depth_idx,  
+            recursion_depth_enabled
         );
 
         false
