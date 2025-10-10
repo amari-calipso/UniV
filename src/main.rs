@@ -1776,16 +1776,34 @@ impl UniV {
         }
     }
 
-    fn handle_stop(&self) -> Result<(), ExecutionInterrupt> {
+    fn handle_keys(&mut self) -> Result<(), ExecutionInterrupt> {
         if get_expect!(self.rl_handle).is_key_pressed(KeyboardKey::KEY_S) {
             Err(ExecutionInterrupt::StopAlgorithm)
+        } else if get_expect!(self.rl_handle).is_key_pressed(KeyboardKey::KEY_P) {
+            self.save_background();
+            let rl = get_expect_mut!(self.rl_handle);
+            let thread = get_expect!(self.rl_thread);
+            self.gui.begin(rl);
+
+            loop {
+                self.gui.update(rl)?;
+                self.gui.paused();
+                self.gui.render(rl, thread);
+
+                if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                    break;
+                }
+            }
+
+            self.gui.end(rl, thread);
+            Ok(())
         } else {
             Ok(())
         }
     }
 
     fn realtime_highlight(&mut self, highlights: Vec<HighlightInfo>) -> Result<(), ExecutionInterrupt> {
-        self.handle_stop()?;
+        self.handle_keys()?;
         self.prepare_highlights(highlights)?;
 
         if !self.should_render_realtime() {
@@ -1892,7 +1910,7 @@ impl UniV {
     }
 
     fn rendered_highlight(&mut self, highlights: Vec<HighlightInfo>) -> Result<(), ExecutionInterrupt> {
-        self.handle_stop()?;
+        self.handle_keys()?;
         self.prepare_highlights(highlights)?;
 
         if !self.keep_empty_frames && self.set_hl_buf.is_empty() {

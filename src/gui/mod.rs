@@ -26,6 +26,7 @@ mod run_all_sorts;
 mod run_all_shuffles;
 mod automation_selection;
 mod configure_stats;
+mod paused;
 
 #[derive(Clone)]
 pub enum FileOption {
@@ -74,6 +75,8 @@ pub struct Gui {
     settings_window_size_y: f32,
     config_stats_window_size_x: f32,
     config_stats_window_size_y: f32,
+    paused_popup_size_x: f32,
+    paused_popup_size_y: f32,
 
     pub distributions:    Vec<Rc<str>>,
     pub shuffles:         Vec<Rc<str>>,
@@ -112,6 +115,8 @@ impl Gui {
     const SETTINGS_WINDOW_DIV_Y: f32 = 1.15;
     const CONFIG_STATS_WINDOW_DIV_X: f32 = 3.0;
     const CONFIG_STATS_WINDOW_DIV_Y: f32 = 2.0;
+    const PAUSED_POPUP_DIV_X: f32 = 4.0;
+    const PAUSED_POPUP_DIV_Y: f32 = 32.0;
 
     const ITEMS_Y_ADJUST: f32 = 10.0;
 
@@ -152,6 +157,8 @@ impl Gui {
             settings_window_size_y: 0.0,
             config_stats_window_size_x: 0.0,
             config_stats_window_size_y: 0.0,
+            paused_popup_size_x: 0.0,
+            paused_popup_size_y: 0.0,
 
             distributions: Vec::new(),
             shuffles: Vec::new(),
@@ -208,6 +215,8 @@ impl Gui {
         self.settings_window_size_y = self.resolution_y / Gui::SETTINGS_WINDOW_DIV_Y;
         self.config_stats_window_size_x = self.resolution_x / Gui::CONFIG_STATS_WINDOW_DIV_X;
         self.config_stats_window_size_y = self.resolution_y / Gui::CONFIG_STATS_WINDOW_DIV_Y;
+        self.paused_popup_size_x = self.resolution_x / Gui::PAUSED_POPUP_DIV_X;
+        self.paused_popup_size_y = self.resolution_y / Gui::PAUSED_POPUP_DIV_Y;
     }
 
     fn placeholder_fn(&mut self) -> bool {
