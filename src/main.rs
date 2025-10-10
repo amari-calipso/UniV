@@ -524,8 +524,8 @@ macro_rules! render_stats {
                 $slf.text_buf.push_str(format!("{:.4} {}\n", time, unit).as_str());
             }
 
-            if let Some(mode) = $slf.settings.stats.recursion_depth {
-                $slf.text_buf.push_str("Recursion depth: ");
+            if let Some(mode) = $slf.settings.stats.call_stack_depth {
+                $slf.text_buf.push_str("Call stack depth: ");
                 $slf.text_buf.push_str(&mode.format($slf.vm.call_stack_depth, $slf.vm.max_call_stack_depth));
                 $slf.text_buf.push('\n');
             }

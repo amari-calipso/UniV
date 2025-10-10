@@ -63,35 +63,35 @@ impl StatMode {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub enum RecursionDepthMode {
+pub enum CallStackDepthMode {
     Enabled,
     WithMax
 }
 
-impl RecursionDepthMode {
-    pub const fn all() -> &'static [RecursionDepthMode] {
-        &[RecursionDepthMode::Enabled, RecursionDepthMode::WithMax]
+impl CallStackDepthMode {
+    pub const fn all() -> &'static [CallStackDepthMode] {
+        &[CallStackDepthMode::Enabled, CallStackDepthMode::WithMax]
     }
 
     pub const fn as_str(self) -> &'static str {
         match self {
-            RecursionDepthMode::Enabled => "Current depth only",
-            RecursionDepthMode::WithMax => "Current and max depth",
+            CallStackDepthMode::Enabled => "Current depth only",
+            CallStackDepthMode::WithMax => "Current and max depth",
         }
     }
 
-    pub fn from_str(name: &str) -> Option<RecursionDepthMode> {
+    pub fn from_str(name: &str) -> Option<CallStackDepthMode> {
         match name {
-            "Current depth only" => Some(RecursionDepthMode::Enabled),
-            "Current and max depth" => Some(RecursionDepthMode::WithMax),
+            "Current depth only" => Some(CallStackDepthMode::Enabled),
+            "Current and max depth" => Some(CallStackDepthMode::WithMax),
             _ => None
         }
     }
 
     pub fn format(self, depth: usize, max_depth: usize) -> String {
         match self {
-            RecursionDepthMode::Enabled => depth.to_formatted_string(&LOCALE),
-            RecursionDepthMode::WithMax => {
+            CallStackDepthMode::Enabled => depth.to_formatted_string(&LOCALE),
+            CallStackDepthMode::WithMax => {
                 format!(
                     "{} ({} max)",
                     depth.to_formatted_string(&LOCALE),
@@ -112,7 +112,7 @@ pub struct StatsSettings {
     pub reads: Option<StatMode>,
     pub comparisons: bool,
     pub time: bool,
-    pub recursion_depth: Option<RecursionDepthMode>,
+    pub call_stack_depth: Option<CallStackDepthMode>,
 }
 
 impl StatsSettings {
@@ -125,7 +125,7 @@ impl StatsSettings {
             reads: Some(StatMode::Combined),
             comparisons: true,
             time: true,
-            recursion_depth: None,
+            call_stack_depth: None,
         }
     }
 }

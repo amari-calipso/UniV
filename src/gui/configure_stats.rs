@@ -1,17 +1,17 @@
-use crate::{settings::{RecursionDepthMode, StatMode}, utils::linear_search};
+use crate::{settings::{CallStackDepthMode, StatMode}, utils::linear_search};
 
 use super::Gui;
 
 pub struct ConfigureStats {
     pub stat_modes: Vec<&'static str>,
-    pub recursion_depth_modes: Vec<&'static str>
+    pub call_stack_depth_modes: Vec<&'static str>
 }
 
 impl ConfigureStats {
     pub fn new() -> Self {
         ConfigureStats { 
             stat_modes: StatMode::all().into_iter().map(|x| x.as_str()).collect(),
-            recursion_depth_modes: RecursionDepthMode::all().into_iter().map(|x| x.as_str()).collect()
+            call_stack_depth_modes: CallStackDepthMode::all().into_iter().map(|x| x.as_str()).collect()
         }
     }
 
@@ -32,18 +32,18 @@ impl ConfigureStats {
         }
     }
 
-    fn read_recursion_depth_option(&mut self, rdm: Option<RecursionDepthMode>, idx: &mut usize, enabled: &mut bool) {
+    fn read_call_stack_depth_option(&mut self, rdm: Option<CallStackDepthMode>, idx: &mut usize, enabled: &mut bool) {
         if let Some(rdm) = rdm {
-            *idx = linear_search(&self.recursion_depth_modes, &rdm.as_str()).unwrap();
+            *idx = linear_search(&self.call_stack_depth_modes, &rdm.as_str()).unwrap();
             *enabled = true;
         } else {
             *enabled = false;
         }
     }
 
-    fn write_recursion_depth_option(&self, rdm: &mut Option<RecursionDepthMode>, idx: usize, enabled: bool) {
+    fn write_call_stack_depth_option(&self, rdm: &mut Option<CallStackDepthMode>, idx: usize, enabled: bool) {
         if enabled {
-            *rdm = Some(RecursionDepthMode::from_str(self.recursion_depth_modes[idx]).unwrap());
+            *rdm = Some(CallStackDepthMode::from_str(self.call_stack_depth_modes[idx]).unwrap());
         } else {
             *rdm = None;
         }
@@ -62,13 +62,13 @@ macro_rules! stat_gui {
     };
 }
 
-macro_rules! recursion_depth_gui {
+macro_rules! call_stack_depth_gui {
     ($slf: expr, $ui: expr, $name: literal, $idx: ident, $enabled: ident) => {
         {
             $ui.checkbox($name, &mut $enabled);
             $ui.same_line();
             $ui.disabled(!$enabled, || {
-                $ui.combo_simple_string(concat!("##", $name), &mut $idx, &$slf.recursion_depth_modes);
+                $ui.combo_simple_string(concat!("##", $name), &mut $idx, &$slf.call_stack_depth_modes);
             });
         }  
     };
@@ -82,16 +82,16 @@ impl Gui {
         let mut swaps_idx = 0usize;
         let mut reads_enabled = true;
         let mut reads_idx = 0usize;
-        let mut recursion_depth_enabled = true;
-        let mut recursion_depth_idx = 0usize;
+        let mut call_stack_depth_enabled = true;
+        let mut call_stack_depth_idx = 0usize;
 
         self.configure_stats.read_stat_option(self.settings.object.stats.writes, &mut writes_idx, &mut writes_enabled);
         self.configure_stats.read_stat_option(self.settings.object.stats.swaps,  &mut swaps_idx,  &mut swaps_enabled);
         self.configure_stats.read_stat_option(self.settings.object.stats.reads,  &mut reads_idx,  &mut reads_enabled);
-        self.configure_stats.read_recursion_depth_option(
-            self.settings.object.stats.recursion_depth, 
-            &mut recursion_depth_idx,  
-            &mut recursion_depth_enabled
+        self.configure_stats.read_call_stack_depth_option(
+            self.settings.object.stats.call_stack_depth, 
+            &mut call_stack_depth_idx,  
+            &mut call_stack_depth_enabled
         );
 
         let ui = self.imgui.new_frame();
@@ -141,7 +141,7 @@ impl Gui {
                 ui.checkbox("Time", &mut self.settings.object.stats.time);
                 ui.spacing();
 
-                recursion_depth_gui!(self.configure_stats, ui, "Recursion depth", recursion_depth_idx, recursion_depth_enabled);
+                call_stack_depth_gui!(self.configure_stats, ui, "Call stack depth", call_stack_depth_idx, call_stack_depth_enabled);
 
                 ui.set_cursor_pos([ui.cursor_pos()[0], ui.window_content_region_max()[1] - Gui::BACK_BUTTON_Y_SIZE]);
                 if ui.button("Back") {
@@ -152,10 +152,10 @@ impl Gui {
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.writes, writes_idx, writes_enabled);
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.swaps,   swaps_idx,  swaps_enabled);
         self.configure_stats.write_stat_option(&mut self.settings.object.stats.reads,   reads_idx,  reads_enabled);
-        self.configure_stats.write_recursion_depth_option(
-            &mut self.settings.object.stats.recursion_depth,   
-            recursion_depth_idx,  
-            recursion_depth_enabled
+        self.configure_stats.write_call_stack_depth_option(
+            &mut self.settings.object.stats.call_stack_depth,   
+            call_stack_depth_idx,  
+            call_stack_depth_enabled
         );
 
         false
