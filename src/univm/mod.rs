@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::max, collections::{HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
@@ -479,9 +479,11 @@ pub struct UniVM {
     pub call_stack_depth: usize,
     /// Maximum call stack depth through the entire VM execution session
     pub max_call_stack_depth: usize,
-    /// Maximum recursion depth between all currently running tasks
+    /// Maximum recursion depth between all currently running tasks.
+    /// This is only populated if the recursion depth stat is enabled in the settings
     pub recursion_depth: usize,
-    /// Maximum recursion depth through the entire VM execution session
+    /// Maximum recursion depth through the entire VM execution session.
+    /// /// This is only populated if the recursion depth stat is enabled in the settings
     pub max_recursion_depth: usize,
 
     recursion_frequencies: Option<IdentityHashMap<u64, usize>>
@@ -607,7 +609,7 @@ impl UniV {
                             }
                         }
 
-                        let top_frequency = max(frequencies.values().cloned().max().unwrap(), 1) - 1;
+                        let top_frequency = frequencies.values().cloned().max().unwrap() - 1;
                         if top_frequency > self.vm.recursion_depth {
                             self.vm.recursion_depth = top_frequency;
 
