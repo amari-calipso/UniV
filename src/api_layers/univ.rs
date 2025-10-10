@@ -597,23 +597,37 @@ api_layer_fn! {
             let a = expect_int(&args[1], "second argument of 'UniV_invisibleSwap'", univ)?;
             let b = expect_int(&args[2], "third argument of 'UniV_invisibleSwap'", univ)?;
 
-            let right;
-            with_timer!(univ, {
-                let tmp = list.get_with_exception(a, univ)?;
-                right = list.get_with_exception(b, univ)?;
-                list.set(a, right.clone()).unwrap();
-                list.set(b, tmp).unwrap();
-            });
+            let fail = univ.settings.unreliability.enabled && univ.rng.random_bool(univ.settings.unreliability.swaps);
+
+            let left;
+            if fail {
+                // don't swap, but still perform the same operations so you can track time properly
+                with_timer!(univ, {
+                    left = list.get_with_exception(a, univ)?;
+                    let right = list.get_with_exception(b, univ)?;
+                    list.set(a, left.clone()).unwrap();
+                    list.set(b, right).unwrap();
+                });
+            } else {
+                with_timer!(univ, {
+                    left = list.get_with_exception(a, univ)?;
+                    let right = list.get_with_exception(b, univ)?;
+                    list.set(a, right).unwrap();
+                    list.set(b, left.clone()).unwrap();
+                });
+            }
 
             if univ.get_optional_aux_id(obj.as_ptr() as *const AnyObject).is_none() {
+                univ.main_stats.failed_swaps += fail as u64;
                 univ.main_stats.swaps  += 1;
                 univ.main_stats.writes += 2;
             } else {
+                univ.aux_stats.failed_swaps += fail as u64;
                 univ.aux_stats.swaps  += 1;
                 univ.aux_stats.writes += 2;
             }
 
-            Ok(right)
+            Ok(left)
         } else {
             Err(univ.vm.create_exception(UniLValue::String(format!(
                 "Expecting list as first argument of 'UniV_invisibleSwap' but got {}",

@@ -504,7 +504,7 @@ impl UniV {
         if self.render.active {
             self.render.recording_duration = Duration::ZERO;
 
-            if self.settings.save_timestamps {
+            if self.settings.render.save_timestamps {
                 self.render.timestamp_file = Some(
                     File::create("timestamps.txt")
                         .map_err(|e| self.vm.create_exception(UniLValue::String(e.to_string().into())))?

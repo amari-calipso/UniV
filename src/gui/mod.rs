@@ -113,7 +113,7 @@ impl Gui {
     const MEDIUM_WINDOW_DIV: f32 = 2.0;
     const SETTINGS_WINDOW_DIV_X: f32 = 2.0;
     const SETTINGS_WINDOW_DIV_Y: f32 = 1.15;
-    const CONFIG_STATS_WINDOW_DIV_X: f32 = 3.0;
+    const CONFIG_STATS_WINDOW_DIV_X: f32 = 2.0;
     const CONFIG_STATS_WINDOW_DIV_Y: f32 = 2.0;
     const PAUSED_POPUP_DIV_X: f32 = 4.0;
     const PAUSED_POPUP_DIV_Y: f32 = 32.0;

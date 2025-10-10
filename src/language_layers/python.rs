@@ -2279,17 +2279,25 @@ mod headers {
                         _ => ()
                     }
 
+                    // if indent is not 0, we are in a class
+                    let in_class = indent != 0;
+
+                    if in_class {
+                        push_indent(buf, indent);
+                        buf.push_str("@staticmethod\n");
+                    }
+
                     push_indent(buf, indent);
                     buf.push_str("def ");
                     buf.push_str(name);
                     buf.push('(');
 
                     for (i, arg) in args.iter().enumerate() {
-                        // if indent is not 0, we are in a class. methods have an extra field that 
-                        // is an artifact of transpilation (every call to a method is translated to object.method(object, args...)).
+                        // methods have an extra field that is an artifact of transpilation 
+                        // (every call to a method is translated to object.method(object, args...)).
                         // but because to the IDEs the methods will look like they're static when you call them, 
                         // we skip the first one when we're in a class, so the IDE gives proper hints
-                        if indent != 0 && i == 0 {
+                        if in_class && i == 0 {
                             continue;
                         }
 
@@ -2387,8 +2395,8 @@ class Value:
     def readNoMark(self) -> Tuple["Value", None]: ...
     def readDigit(self) -> int: ...
     def swap(self, other: "Value") -> "Value": ...
-    def write(self, other: "Value" | int) -> "Value": ...
-    def writeRestoreIdx(self, other: "Value" | int, idx: None) -> "Value": ...
+    def write(self, other: "Value | int") -> "Value": ...
+    def writeRestoreIdx(self, other: "Value | int", idx: None) -> "Value": ...
 
 class RotationMode(IntEnum):
     INDEXED, LENGTHS = range(2)

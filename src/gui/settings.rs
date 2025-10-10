@@ -66,7 +66,7 @@ impl Settings {
                     } else {
                         self.profiles.sort();
 
-                        if let Ok(index) = self.profiles.binary_search(&Rc::from(self.object.profile.as_str())) {
+                        if let Ok(index) = self.profiles.binary_search(&Rc::from(self.object.render.profile.as_str())) {
                             self.curr_profile = index;
                         } else {
                             self.curr_profile = 0;
@@ -151,8 +151,7 @@ impl Gui {
                 }
 
                 ui.spacing();
-                imgui_centered_text!(ui, "Graphics");
-                imgui_spaced_separator!(ui);
+
 
                 ui.input_scalar_n("Resolution (x, y)", &mut self.settings.object.resolution).build();
 
@@ -202,15 +201,15 @@ impl Gui {
                 imgui_centered_text!(ui, "Render mode");
                 imgui_spaced_separator!(ui);
 
-                ui.checkbox("Enable (off is real time mode)", &mut self.settings.object.render);
+                ui.checkbox("Enable (off is real time mode)", &mut self.settings.object.render.enabled);
                 if ui.is_item_hovered() {
                     ui.tooltip(|| {
                         ui.text("Enables render mode");
                     });
                 }
 
-                ui.disabled(!self.settings.object.render, || {
-                    ui.checkbox("Save timestamps", &mut self.settings.object.save_timestamps);
+                ui.disabled(!self.settings.object.render.enabled, || {
+                    ui.checkbox("Save timestamps", &mut self.settings.object.render.save_timestamps);
                 });
                 if ui.is_item_hovered_with_flags(ItemHoveredFlags::ALLOW_WHEN_DISABLED) {
                     ui.tooltip(|| {
@@ -222,49 +221,76 @@ impl Gui {
                     });
                 }
 
-                ui.input_scalar("FPS", &mut self.settings.object.render_fps).build();
+                ui.input_scalar("FPS", &mut self.settings.object.render.fps).build();
                 if ui.is_item_hovered() {
                     ui.tooltip(|| {
                         ui.text("Sets the video output FPS for render mode");
                     });
                 }
 
-                ui.input_scalar("Bitrate (kbps)", &mut self.settings.object.bitrate).build();
+                ui.input_scalar("Bitrate (kbps)", &mut self.settings.object.render.bitrate).build();
                 ui.combo_simple_string("Profile", &mut self.settings.curr_profile, &self.settings.profiles);
 
                 ui.spacing();
-                imgui_centered_text!(ui, "Other");
+
+                imgui_centered_text!(ui, "Unreliability");
                 imgui_spaced_separator!(ui);
 
+                ui.checkbox("Enable", &mut self.settings.object.unreliability.enabled);
+                if ui.is_item_hovered() {
+                    ui.tooltip(|| {
+                        ui.text("Enables unreliability. Comparisons and swaps have a chance of failing");
+                    });
+                }
+
+                ui.disabled(!self.settings.object.unreliability.enabled, || {
+                    ui.spacing();
+                    ui.slider("Comparison failure rate", 0f64, 1f64, &mut self.settings.object.unreliability.comparisons);
+                    ui.spacing();
+                    ui.slider("Swap failure rate", 0f64, 1f64, &mut self.settings.object.unreliability.swaps);
+                });
+                
                 if cfg!(not(feature = "lite")) {
+                    ui.spacing();
+                    imgui_centered_text!(ui, "Other");
+                    imgui_spaced_separator!(ui);
+
                     if ui.button("Reload algorithms") {
                         self.settings.reload_algos = true;
                         quit = true;
                     }
                 }
 
-                ui.set_cursor_pos([ui.cursor_pos()[0], ui.window_content_region_max()[1] - Gui::BACK_BUTTON_Y_SIZE]);
-                if ui.button("Back") {
-                    self.settings.back = true;
-                    quit = true;
+                ui.spacing();
+                ui.spacing();
+
+                let save_y_end_pos;
+                if ui.cursor_pos()[1] + Gui::SAVE_BUTTON_Y_SIZE >= ui.window_content_region_max()[1] {
+                    save_y_end_pos = ui.cursor_pos()[1] + Gui::SAVE_BUTTON_Y_SIZE;
+                } else {
+                    save_y_end_pos = ui.window_content_region_max()[1];
                 }
 
-                ui.same_line();
                 ui.set_cursor_pos([
                     ui.window_content_region_max()[0] - Gui::SAVE_BUTTON_X_SIZE, 
-                    ui.window_content_region_max()[1] - Gui::SAVE_BUTTON_Y_SIZE
+                    save_y_end_pos - Gui::SAVE_BUTTON_Y_SIZE
                 ]);
-                
                 if ui.button_with_size("Save", [Gui::SAVE_BUTTON_X_SIZE, Gui::SAVE_BUTTON_Y_SIZE]) {
                     quit = true;
                 }
+
+                ui.set_cursor_pos([ui.cursor_pos()[0], save_y_end_pos - Gui::BACK_BUTTON_Y_SIZE]);
+                if ui.button("Back") {
+                    self.settings.back = true;
+                    quit = true;
+                }                
             });
 
         if quit && !self.settings.back {
             let profile = self.settings.profiles[self.settings.curr_profile].to_string();
 
             if profile.as_str() != "<no profiles>" {
-                self.settings.object.profile = profile;
+                self.settings.object.render.profile = profile;
             }
             
             self.settings.object.sound = self.sounds[self.settings.curr_sound].name.to_string();

@@ -25,7 +25,7 @@ use visual::Visual;
 use sound::Sound;
 use highlights::HighlightInfo;
 use value::{Value, VerifyValue};
-use settings::{Profile, UniVSettings};
+use settings::{Profile, UniVSettings, StatMode};
 use unil::ast::Expression;
 use utils::report_errors;
 use compiler::type_system::UniLType;
@@ -173,9 +173,10 @@ impl std::fmt::Debug for Audio {
 
 #[derive(Debug)]
 struct ArrayStats {
-    pub writes: u64,
-    pub reads:  u64,
-    pub swaps:  u64,
+    pub writes:       u64,
+    pub reads:        u64,
+    pub swaps:        u64,
+    pub failed_swaps: u64,
 }
 
 pub type LanguageLayerFn = fn(String, Rc<str>) -> Result<Vec<Expression>, Vec<String>>;
@@ -215,8 +216,9 @@ pub struct UniV {
 
     main_stats:  ArrayStats,
     aux_stats:   ArrayStats,
-    comparisons: u64,
-    time:        f64,
+    comparisons:        u64,
+    failed_comparisons: u64,
+    time:               f64,
 
     highlights: Vec<HighlightInfo>,
     marks:      IdentityHashMap<usize, HighlightInfo>,
@@ -320,6 +322,7 @@ impl UniV {
             main_stats: ArrayStats::new(),
             aux_stats: ArrayStats::new(),
             comparisons: 0,
+            failed_comparisons: 0,
             time: 0.0,
 
             highlights: Vec::new(),
@@ -417,6 +420,7 @@ impl ArrayStats {
             writes: 0,
             swaps: 0,
             reads: 0,
+            failed_swaps: 0
         }
     }
 
@@ -424,6 +428,7 @@ impl ArrayStats {
         self.writes = 0;
         self.swaps = 0;
         self.reads = 0;
+        self.failed_swaps = 0;
     }
 }
 
@@ -479,13 +484,18 @@ macro_rules! render_stats {
 
             if let Some(mode) = $slf.settings.stats.writes {
                 $slf.text_buf.push_str("Writes: ");
-                $slf.text_buf.push_str(&mode.format($slf.main_stats.writes, $slf.aux_stats.writes));
+                mode.format(&mut $slf.text_buf, $slf.main_stats.writes, $slf.aux_stats.writes);
                 $slf.text_buf.push('\n');
             }
 
             if let Some(mode) = $slf.settings.stats.swaps {
                 $slf.text_buf.push_str("Swaps: ");
-                $slf.text_buf.push_str(&mode.format($slf.main_stats.swaps, $slf.aux_stats.swaps));
+                mode.format_with_fails(
+                    &mut $slf.text_buf, 
+                    $slf.main_stats.swaps, $slf.aux_stats.swaps,
+                    $slf.settings.stats.failed_swaps,
+                    $slf.main_stats.failed_swaps, $slf.aux_stats.failed_swaps
+                );
                 $slf.text_buf.push('\n');
             }
 
@@ -495,15 +505,16 @@ macro_rules! render_stats {
 
             if let Some(mode) = $slf.settings.stats.reads {
                 $slf.text_buf.push_str("Reads: ");
-                $slf.text_buf.push_str(&mode.format($slf.main_stats.reads, $slf.aux_stats.reads));
+                mode.format(&mut $slf.text_buf, $slf.main_stats.reads, $slf.aux_stats.reads);
                 $slf.text_buf.push('\n');
             }
 
             if $slf.settings.stats.comparisons {
                 $slf.text_buf.push_str("Comparisons: ");
                 $slf.text_buf.push_str(&$slf.comparisons.to_formatted_string(&LOCALE));
+                StatMode::format_fails(&mut $slf.text_buf, $slf.settings.stats.failed_comparisons, $slf.failed_comparisons);
                 $slf.text_buf.push('\n');
-            } 
+            }
 
             if $slf.settings.stats.reads.is_some() || $slf.settings.stats.comparisons {
                 $slf.text_buf.push('\n');
@@ -526,14 +537,30 @@ macro_rules! render_stats {
 
             if let Some(mode) = $slf.settings.stats.call_stack_depth {
                 $slf.text_buf.push_str("Call stack depth: ");
-                $slf.text_buf.push_str(&mode.format($slf.vm.call_stack_depth, $slf.vm.max_call_stack_depth));
+                mode.format(&mut $slf.text_buf, $slf.vm.call_stack_depth, $slf.vm.max_call_stack_depth);
                 $slf.text_buf.push('\n');
             }
 
             if let Some(mode) = $slf.settings.stats.recursion_depth {
                 $slf.text_buf.push_str("Recursion depth: ");
-                $slf.text_buf.push_str(&mode.format($slf.vm.recursion_depth, $slf.vm.max_recursion_depth));
+                mode.format(&mut $slf.text_buf, $slf.vm.recursion_depth, $slf.vm.max_recursion_depth);
                 $slf.text_buf.push('\n');
+            }
+
+            if $slf.settings.stats.call_stack_depth.is_some() || $slf.settings.stats.recursion_depth.is_some() {
+                $slf.text_buf.push('\n');
+            }
+
+            if $slf.settings.unreliability.enabled {
+                if $slf.settings.unreliability.swaps != 0.0 {
+                    $slf.text_buf.push_str("Swap failure rate: ");
+                    $slf.text_buf.push_str(format!("{:.4}%\n", $slf.settings.unreliability.swaps * 100.0).as_str());
+                }
+
+                if $slf.settings.unreliability.comparisons != 0.0 {
+                    $slf.text_buf.push_str("Comparison failure rate: ");
+                    $slf.text_buf.push_str(format!("{:.4}%\n", $slf.settings.unreliability.comparisons * 100.0).as_str());
+                }
             }
 
             utils::gfx::draw_outline_text(
@@ -552,7 +579,7 @@ macro_rules! render_stats {
                     recording_duration = utils::duration_to_hms(&$slf.render.recording_duration);
                     dropped_frames = (
                         1.0 - min(
-                            OrderedFloat($slf.settings.render_fps as f64),
+                            OrderedFloat($slf.settings.render.fps as f64),
                             OrderedFloat(1.0 / $slf.render.frame_duration)
                         ).0 / (REFERENCE_FRAMERATE * $slf.render.speed_cnt_max) as f64) * 100.0;
                 } else {
@@ -633,6 +660,7 @@ impl UniV {
         self.main_stats.reset();
         self.aux_stats.reset();
         self.comparisons = 0;
+        self.failed_comparisons = 0;
         self.time = 0.0;
     }
 
@@ -931,7 +959,7 @@ impl UniV {
         self.adapt_hl_buf.clear();
         self.adapt_hl_buf.push(HighlightInfo::new(index, None, Some(color), false, false));
 
-        let result_frame_duration = 1.0 / self.settings.render_fps as f64;
+        let result_frame_duration = 1.0 / self.settings.render.fps as f64;
 
         let frame_duration = max(
             OrderedFloat(result_frame_duration),
@@ -963,7 +991,7 @@ impl UniV {
             draw_flipped_texture!(draw, self.render_texture.as_ref().unwrap(), width, height);
         }
 
-        if heatmap::should_tick(self.heatmap_cnt, self.settings.render_fps) {
+        if heatmap::should_tick(self.heatmap_cnt, self.settings.render.fps) {
             self.heatmap_cnt = 0;
             self.shared.heatmap.tick();
         }
@@ -1122,7 +1150,7 @@ impl UniV {
 
         self.render.speed_cnt_max = 1;
         self.render.speed_cnt = 1;
-        self.render.frame_duration = 1.0 / self.settings.render_fps as f64;
+        self.render.frame_duration = 1.0 / self.settings.render.fps as f64;
         self.tmp_sleep = 0.0;
         self.target_fps = REFERENCE_FRAMERATE;
         self.keep_empty_frames = true;
@@ -1522,7 +1550,7 @@ impl UniV {
         let ref_fps_f64 = REFERENCE_FRAMERATE as f64;
 
         if self.render.active {
-            let render_fps_f64 = self.settings.render_fps as f64;
+            let render_fps_f64 = self.settings.render.fps as f64;
             let render_speed = speed * (ref_fps_f64 / render_fps_f64);
 
             if render_speed >= 1.0 {
@@ -1551,7 +1579,7 @@ impl UniV {
         let ref_fps_f64 = REFERENCE_FRAMERATE as f64;
 
         if self.render.active {
-            let ref_over_render = ref_fps_f64 / self.settings.render_fps as f64;
+            let ref_over_render = ref_fps_f64 / self.settings.render.fps as f64;
 
             if self.render.speed_cnt_max == 0 {
                 (self.render.frame_duration * 1000.0) / ref_over_render
@@ -1571,7 +1599,7 @@ impl UniV {
     pub fn reset_speed(&mut self) {
         self.target_fps = REFERENCE_FRAMERATE;
         self.render.speed_cnt = 1;
-        self.render.frame_duration = 1.0 / self.settings.render_fps as f64;
+        self.render.frame_duration = 1.0 / self.settings.render.fps as f64;
     }
 
     #[inline]
@@ -1875,11 +1903,11 @@ impl UniV {
                         "-f", "rawvideo",
                         "-pix_fmt", "rgba",
                         "-s", &format!("{}x{}", frame.width, frame.height),
-                        "-r", &self.settings.render_fps.to_string(),
+                        "-r", &self.settings.render.fps.to_string(),
                         "-i", "-",
 
                         // output
-                        "-b:v", &format!("{}k", self.settings.bitrate),
+                        "-b:v", &format!("{}k", self.settings.render.bitrate),
                         "-c:v", &self.profile.codec,
                         "-profile:v", &self.profile.profile,
                         "-pix_fmt", &self.profile.pix_fmt,
@@ -1934,7 +1962,7 @@ impl UniV {
         let aux = self.prepare_aux()?;
         self.adapt_indices()?;
 
-        let result_frame_duration = 1.0 / self.settings.render_fps as f64;
+        let result_frame_duration = 1.0 / self.settings.render.fps as f64;
 
         let frame_duration = max(
             OrderedFloat(result_frame_duration),
@@ -1977,7 +2005,7 @@ impl UniV {
             draw_flipped_texture!(draw, self.render_texture.as_ref().unwrap(), width, height);
         }
 
-        if heatmap::should_tick(self.heatmap_cnt, self.settings.render_fps) {
+        if heatmap::should_tick(self.heatmap_cnt, self.settings.render.fps) {
             self.heatmap_cnt = 0;
             self.shared.heatmap.tick();
 
@@ -2111,7 +2139,7 @@ impl UniV {
     fn try_load_current_profile(&mut self) {
         log!(TraceLogLevel::LOG_INFO, "Loading render profile");
 
-        match Profile::load(&self.settings.profile) {
+        match Profile::load(&self.settings.render.profile) {
             Ok(profile) => self.profile = profile,
             Err(e) => {
                 log!(TraceLogLevel::LOG_ERROR, "Could not load chosen profile");
@@ -2143,12 +2171,13 @@ impl UniV {
                         }
 
                         self.try_save_settings();
+                        return;
                     }
-                } else {
-                    log!(TraceLogLevel::LOG_ERROR, "Could not load user settings");
-                    log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
-                    log!(TraceLogLevel::LOG_WARNING, "Using default settings");
                 }
+
+                log!(TraceLogLevel::LOG_ERROR, "Could not load user settings");
+                log!(TraceLogLevel::LOG_ERROR, "    > {}", e.to_string());
+                log!(TraceLogLevel::LOG_WARNING, "Using default settings");
             }
         }
 
@@ -2674,7 +2703,7 @@ impl UniV {
         self.render.active = true;
         self.render_fn = Self::rendered_highlight;
         self.sweep_frame_fn = Self::sweep_rendered_frame;
-        self.shared.fps = self.settings.render_fps as u32;
+        self.shared.fps = self.settings.render.fps as u32;
     }
 
     fn enable_realtime_mode(&mut self) {
@@ -3205,9 +3234,9 @@ impl UniV {
     fn main_menu(&mut self) -> Result<(), ExecutionInterrupt> {
         loop {
             #[cfg(not(feature = "dev"))]
-            if self.settings.render {
+            if self.settings.render.enabled {
                 if !self.render.active && !self.find_or_install_ffmpeg()? {
-                    self.settings.render = false;
+                    self.settings.render.enabled = false;
                     self.try_save_settings();
                     continue;
                 }
@@ -3568,9 +3597,9 @@ impl UniV {
                                     .expect("GUI returned invalid sound ID");
                             }
 
-                            let new_res     = self.settings.resolution != self.gui.settings.object.resolution;
-                            let new_reverb  = self.settings.reverb     != self.gui.settings.object.reverb;
-                            let new_profile = self.settings.profile    != self.gui.settings.object.profile;
+                            let new_res     = self.settings.resolution     != self.gui.settings.object.resolution;
+                            let new_reverb  = self.settings.reverb         != self.gui.settings.object.reverb;
+                            let new_profile = self.settings.render.profile != self.gui.settings.object.render.profile;
 
                             if self.settings != self.gui.settings.object {
                                 self.settings = self.gui.settings.object.clone();

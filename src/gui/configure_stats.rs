@@ -141,10 +141,20 @@ impl Gui {
                 stat_gui!(self.configure_stats, ui, "Reads", reads_idx, reads_enabled);
                 ui.spacing();
 
-                stat_gui!(self.configure_stats, ui, "Swaps", swaps_idx, swaps_enabled);
+                ui.checkbox("Swaps", &mut swaps_enabled);
+                ui.disabled(!swaps_enabled, || {
+                    ui.same_line();
+                    ui.checkbox("Show failed", &mut self.settings.object.stats.failed_swaps);
+                    ui.same_line();
+                    ui.combo_simple_string("##swaps", &mut swaps_idx, &self.configure_stats.stat_modes);
+                });
                 ui.spacing();
 
                 ui.checkbox("Comparisons", &mut self.settings.object.stats.comparisons);
+                ui.disabled(!self.settings.object.stats.comparisons, || {
+                    ui.same_line();
+                    ui.checkbox("Show failed", &mut self.settings.object.stats.failed_comparisons);
+                });
                 ui.spacing();
 
                 ui.checkbox("Time", &mut self.settings.object.stats.time);

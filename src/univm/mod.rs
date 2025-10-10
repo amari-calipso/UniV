@@ -4,6 +4,7 @@ use alanglib::ast::SourcePos;
 use bytecode::{Bytecode, Instruction};
 use environment::Environment;
 use object::{AnonObject, AnyCallable, AnyObject, Callable, ExecutionInterrupt, Function, List, NativeCallable, UniLValue};
+use rand::Rng;
 use raylib::ffi::TraceLogLevel;
 use serde::Serializer;
 
@@ -779,14 +780,9 @@ impl UniV {
                             }
                             Instruction::Mul | Instruction::Add | Instruction::Div | Instruction::Mod |
                             Instruction::Sub | Instruction::Xor | Instruction::Shl | Instruction::Shr |
-                            Instruction::BitAnd | Instruction::BitOr | Instruction::Lt | Instruction::Le |
-                            Instruction::Gt | Instruction::Ge | Instruction::Eq | Instruction::Ne => {
+                            Instruction::BitAnd | Instruction::BitOr => {
                                 let right = task.pop_stack();
                                 let left = task.pop_stack();
-    
-                                if matches!(left, UniLValue::Value { .. }) || matches!(right, UniLValue::Value { .. }) {
-                                    self.comparisons += 1;
-                                }
     
                                 match instruction {
                                     Instruction::Mul => task.op_mul(&left, &right),
@@ -799,6 +795,15 @@ impl UniV {
                                     Instruction::Xor => task.op_xor(&left, &right),
                                     Instruction::BitAnd => task.op_and(&left, &right),
                                     Instruction::BitOr  => task.op_or(&left, &right),
+                                    _ => unreachable!()
+                                }
+                            }
+                            Instruction::Lt | Instruction::Le | Instruction::Gt | Instruction::Ge | 
+                            Instruction::Eq | Instruction::Ne => {
+                                let right = task.pop_stack();
+                                let left = task.pop_stack();
+
+                                match instruction {
                                     Instruction::Lt => task.op_lt(&left, &right),
                                     Instruction::Le => task.op_le(&left, &right),
                                     Instruction::Gt => task.op_gt(&left, &right),
@@ -806,6 +811,16 @@ impl UniV {
                                     Instruction::Eq => task.stack.push(UniLValue::Int( left.equals(&right) as i64)),
                                     Instruction::Ne => task.stack.push(UniLValue::Int(!left.equals(&right) as i64)),
                                     _ => unreachable!()
+                                }
+
+                                if matches!(left, UniLValue::Value { .. }) || matches!(right, UniLValue::Value { .. }) {
+                                    self.comparisons += 1;
+                                    
+                                    if self.settings.unreliability.enabled && self.rng.random_bool(self.settings.unreliability.comparisons) {
+                                        self.failed_comparisons += 1;
+                                        let UniLValue::Int(cmp_result) = task.pop_stack() else { unreachable!() };
+                                        task.stack.push(UniLValue::Int((cmp_result == 0) as i64));
+                                    }
                                 }
                             }
                             Instruction::GetIndex => {
