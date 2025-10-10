@@ -1,3 +1,5 @@
+use imgui::ItemHoveredFlags;
+
 use crate::{settings::{CallStackDepthMode, StatMode}, utils::linear_search};
 
 use super::Gui;
@@ -145,6 +147,12 @@ impl Gui {
                 ui.disabled(!swaps_enabled, || {
                     ui.same_line();
                     ui.checkbox("Show failed", &mut self.settings.object.stats.failed_swaps);
+                    if ui.is_item_hovered_with_flags(ItemHoveredFlags::ALLOW_WHEN_DISABLED) {
+                        ui.tooltip(|| {
+                            ui.text("If unreliability is enabled, shows how many swaps failed");
+                        });
+                    }
+
                     ui.same_line();
                     ui.combo_simple_string("##swaps", &mut swaps_idx, &self.configure_stats.stat_modes);
                 });
@@ -154,6 +162,11 @@ impl Gui {
                 ui.disabled(!self.settings.object.stats.comparisons, || {
                     ui.same_line();
                     ui.checkbox("Show failed", &mut self.settings.object.stats.failed_comparisons);
+                    if ui.is_item_hovered_with_flags(ItemHoveredFlags::ALLOW_WHEN_DISABLED) {
+                        ui.tooltip(|| {
+                            ui.text("If unreliability is enabled, shows how many comparisons failed");
+                        });
+                    }
                 });
                 ui.spacing();
 

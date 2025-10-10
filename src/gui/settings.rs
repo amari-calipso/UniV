@@ -239,7 +239,10 @@ impl Gui {
                 ui.checkbox("Enable", &mut self.settings.object.unreliability.enabled);
                 if ui.is_item_hovered() {
                     ui.tooltip(|| {
-                        ui.text("Enables unreliability. Comparisons and swaps have a chance of failing");
+                        ui.text(concat!(
+                            "Enables unreliability. Comparisons and swaps have a chance of failing.\n",
+                            "May crash some algorithms"
+                        ));
                     });
                 }
 
