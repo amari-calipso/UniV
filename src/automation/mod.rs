@@ -277,7 +277,11 @@ impl UniV {
                 self.automation_interpreter.in_run_all_shuffles = true;
 
                 for statement in statements {
-                    self.evaluate_automation_statement(statement)?;
+                    self.evaluate_automation_statement(statement)
+                        .map_err(|e| {
+                            self.automation_interpreter.in_run_all_shuffles = false;
+                            e
+                        })?;
                 }
 
                 self.automation_interpreter.in_run_all_shuffles = false;
@@ -457,7 +461,11 @@ impl UniV {
                     self.automation_interpreter.run_all_sorts = Some(run_all_category);
 
                     for statement in &category.statements {
-                        self.evaluate_automation_statement(statement)?;
+                        self.evaluate_automation_statement(statement)
+                            .map_err(|e| {
+                                self.automation_interpreter.run_all_sorts = None;
+                                e
+                            })?;
                     }
                 }
 

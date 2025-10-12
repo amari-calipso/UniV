@@ -2320,6 +2320,7 @@ impl UniV {
                     }
 
                     let automation = univ.shuffle_automation.as_ref().unwrap();
+                    univ.automation_interpreter.reset();
                     univ.execute_automation(
                         Rc::clone(&automation.source),
                         Rc::clone(&automation.filename)
@@ -3510,6 +3511,7 @@ impl UniV {
                             }
                         };
 
+                        self.automation_interpreter.reset();
                         if let Err(e) = self.execute_automation(automation.source, automation.filename) {
                             if matches!(e, ExecutionInterrupt::StopAlgorithm) {
                                 self.stop_algorithm()?;
